@@ -1,0 +1,47 @@
+# ── Duplicate / old folder ────────────────────────────────────────────────────
+championcircuit/
+
+# ── OS ────────────────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+
+# ── Node ──────────────────────────────────────────────────────────────────────
+node_modules/
+dist/
+.cache/
+*.tsbuildinfo
+
+# ── Python ────────────────────────────────────────────────────────────────────
+.venv/
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.egg-info/
+.eggs/
+
+# ── Database ──────────────────────────────────────────────────────────────────
+*.db
+*.sqlite
+*.sqlite3
+
+# ── Secrets — NEVER commit these ──────────────────────────────────────────────
+.env
+.env.local
+.env.*.local
+*.pem
+*.key
+client_secret*.json
+
+# ── Uploads (user-generated content) ─────────────────────────────────────────
+backend/uploads/*
+!backend/uploads/.gitkeep
+
+# ── Build & misc ──────────────────────────────────────────────────────────────
+build/
+*.zip
+*.docx
+prep.js
+prep_v2.js
+frontend-profile-check.png
+COMPLETE CODE.zip

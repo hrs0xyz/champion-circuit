@@ -1,0 +1,360 @@
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  CHAMPION CIRCUIT — COMPLETE USER FLOW
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+
+┌─────────────────────────────────────────────────────────────────────┐
+│                        LANDING PAGE                                  │
+│   Hero · Vouchers CTA · Early Access form · About · Contact          │
+└───────────────────────┬─────────────────────────────────────────────┘
+                        │
+          ┌─────────────┴──────────────┐
+          │                            │
+          ▼                            ▼
+   [ Sign Up ]                    [ Log In ]
+          │                            │
+          │                            │
+          ▼                            ▼
+┌─────────────────┐          ┌─────────────────────────────┐
+│  SIGNUP FLOW    │          │        LOGIN FLOW            │
+│                 │          │                              │
+│ 1. Username     │          │  Email or Username           │
+│ 2. Email        │          │  Password                    │
+│ 3. Password     │          │  ──────────────────          │
+│                 │          │  Forgot password?            │
+│       ↓         │          │    → Enter email/username    │
+│  OTP sent       │          │    → OTP to email            │
+│  to email       │          │    → New password            │
+│       ↓         │          │    → Back to login           │
+│  Verify OTP     │          └──────────────┬──────────────┘
+│  (6 boxes)      │                         │
+│       ↓         │                         │
+│  Account        │                         │
+│  created        │                         │
+│  (blank profile)│                         │
+└────────┬────────┘                         │
+         │                                  │
+         └──────────────┬───────────────────┘
+                        │
+                        ▼
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  3 PORTALS — based on account type
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+         ┌──────────────┼──────────────────┐
+         │              │                  │
+         ▼              ▼                  ▼
+  ┌────────────┐  ┌───────────┐   ┌───────────────┐
+  │    USER    │  │  VENUE    │   │     ADMIN     │
+  │  (Player) │  │  (Owner)  │   │  (CC Staff)   │
+  └─────┬──────┘  └─────┬─────┘   └───────┬───────┘
+        │               │                  │
+        │               │                  │
+━━━━━━━━┿━━━━━━━━━━━━━━━┿━━━━━━━━━━━━━━━━━┿━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+
+╔═══════════════════════════════════════════════════════════════════════╗
+║  PORTAL 1 — USER (Player / Fan)                                       ║
+╚═══════════════════════════════════════════════════════════════════════╝
+
+  HOME
+    │
+    ├──▶ PROFILE PAGE
+    │       View: name, @handle, city, avatar, interests, bio
+    │       Edit button (1x per day, password required)
+    │         → Edit: name, city, postal code, bio
+    │         → Select interests (Cricket, BGMI, Valorant…)
+    │         → Upload avatar (JPG/PNG/WEBP, max 3MB)
+    │         → Set gender, date of birth
+    │
+    ├──▶ TURF / BROWSE
+    │       City filter (multi-select)
+    │         → Venue card: name, city, rating, photo
+    │           → Venue detail page
+    │               → Listings (Cricket, Badminton, PlayStation…)
+    │                 → Listing detail
+    │                     → Photos (up to 5)
+    │                     → Amenities, rules, capacity
+    │                     → Available time slots
+    │                     → [ Book Slot ]
+    │                         → Select date + slot
+    │                         → Confirm details
+    │                         → Pay (Razorpay) or Free
+    │                         → Booking confirmed ✓
+    │                         → Email confirmation sent
+    │
+    ├──▶ ESPORTS HUB
+    │       Tabs: Live · Upcoming · Completed · Exclusive
+    │       City filter
+    │         → Tournament card
+    │           → Tournament detail
+    │               → Rules, format, prizes, registrations
+    │               → [ Register ] (solo or with team)
+    │                   → Pay entry fee if required
+    │                   → Registered ✓
+    │               → Results (after completion)
+    │                   → Bracket / standings
+    │
+    ├──▶ VOUCHERS
+    │       City filter (multi-select)
+    │       Browse listings by partner
+    │         → Voucher card: discount / free slot / food / merch
+    │           → [ Buy now ] (paid) or [ Get free ]
+    │               → Enter email, name, phone
+    │               → Pay via Razorpay
+    │               → Voucher issued ✓
+    │               → Code + QR shown on screen
+    │               → Email delivery
+    │         → [ Look it up ] → /my-voucher
+    │               → Enter CC-XXXX-XXXX
+    │               → See status + QR
+    │
+    ├──▶ LEADERBOARD
+    │       City filter (multi-select)
+    │       Sport filter chips (user's preferred sports first ★)
+    │       Rank · Player · Points · Activity tags
+    │       "You" badge on your own row
+    │
+    ├──▶ MY VOUCHERS
+    │       List of all purchased vouchers
+    │       Status: Active · Redeemed · Expired
+    │       Code + QR for each
+    │
+    ├──▶ MY BOOKINGS
+    │       Upcoming and past bookings
+    │       Status: Confirmed · Completed · Cancelled
+    │
+    ├──▶ MY TEAMS
+    │       Create team (name, game/sport, members)
+    │       Invite up to 7 players by email
+    │       Accept/decline invites
+    │       Leave or delete team
+    │
+    └──▶ MATCH HISTORY
+            All matches played
+            Per match: venue, listing, result, points earned
+            Disputed match → raise dispute
+
+
+╔═══════════════════════════════════════════════════════════════════════╗
+║  PORTAL 2 — VENUE (Turf Owner / Gaming Club)                          ║
+╚═══════════════════════════════════════════════════════════════════════╝
+
+  VENUE DASHBOARD
+    │
+    ├──▶ VENUE PROFILE
+    │       Name, logo, cover photo
+    │       Address, city, lat/lng
+    │       Contact info, website
+    │       Verified badge (granted by Admin)
+    │
+    ├──▶ MY LISTINGS
+    │       Create listing
+    │         → Category (Cricket / Badminton / PS5 / Food…)
+    │         → Title, description, rules
+    │         → Capacity, price per hour/session
+    │         → Upload up to 5 photos
+    │         → Add amenities (AC, Floodlit, WiFi…)
+    │         → Tournament eligible toggle
+    │         → Publish / Unpublish
+    │       Edit / Delete listing
+    │
+    ├──▶ TIME SLOTS
+    │       Set recurring weekly slots
+    │       Block dates/times
+    │       View booking calendar
+    │
+    ├──▶ BOOKINGS
+    │       Incoming booking requests
+    │       Confirm / Cancel
+    │       Mark as completed / no-show
+    │       View booking history
+    │
+    ├──▶ MATCH CONTROLLER
+    │       Record a match at your venue
+    │         → Select listing
+    │         → Add players (search by username)
+    │         → Set teams A vs B or solo
+    │         → Enter scores
+    │         → Submit for Admin verification
+    │       View pending / verified matches
+    │
+    ├──▶ VOUCHERS (issued by CC for your venue)
+    │       View vouchers issued for your listings
+    │       Redeem voucher
+    │         → Scan QR code, or
+    │         → Enter code manually
+    │         → Mark as redeemed ✓
+    │
+    ├──▶ REVIEWS
+    │       View all reviews for your listings
+    │       Rating breakdown (1–5 stars)
+    │
+    └──▶ STAFF MANAGEMENT
+            Add venue staff (manager / staff roles)
+            Remove staff
+            Each staff can record matches and redeem vouchers
+
+
+╔═══════════════════════════════════════════════════════════════════════╗
+║  PORTAL 3 — ADMIN (Champion Circuit Staff)                            ║
+╚═══════════════════════════════════════════════════════════════════════╝
+
+  ADMIN DASHBOARD
+    │
+    ├──▶ USERS
+    │       Search / filter all users
+    │       View profile, match history, points
+    │       Ban / unban
+    │       Make admin
+    │
+    ├──▶ VENUES
+    │       View all venues
+    │       Verify venue (grant badge)
+    │       Suspend venue
+    │       View listings, bookings
+    │
+    ├──▶ MATCH CONTROLLER ← KEY FEATURE
+    │       Pending matches (submitted by venues)
+    │         → Review match details
+    │         → Edit scores if wrong
+    │         → Verify match ✓ (triggers points award)
+    │         → Reject with reason
+    │       All matches (filter by venue, game, date)
+    │       Score adjustments
+    │         → Select user
+    │         → +/- points
+    │         → Reason (logged)
+    │
+    ├──▶ TOURNAMENTS
+    │       Create tournament (any venue)
+    │       Edit tournament details
+    │       Manage registrations (accept / reject)
+    │       Record results
+    │         → Set positions 1st, 2nd, 3rd
+    │         → Points auto-calculated
+    │         → Prize amounts
+    │       Mark exclusive / featured
+    │
+    ├──▶ VOUCHERS
+    │       Create voucher listings for any partner
+    │       Set benefit type, price, stock, validity
+    │       View all issued vouchers
+    │       Manually revoke / re-activate
+    │
+    ├──▶ LEADERBOARD
+    │       View computed snapshots
+    │       Trigger recompute
+    │       Override individual scores
+    │       Set period (weekly / monthly / all-time)
+    │
+    ├──▶ PARTNERS
+    │       Add / edit partners
+    │       Generate referral tokens
+    │       View traffic and conversions
+    │
+    └──▶ CONTENT
+            Edit landing page text
+            Feature / unfeature venues and tournaments
+            Announcements / notifications to all users
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  KEY FLOWS — END TO END
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+FLOW A — Player plays a match and earns points:
+
+  User books slot at Himanshu Gaming Club (Cricket)
+       ↓
+  Plays match
+       ↓
+  Venue staff records match on Match Controller
+  (adds all players, sets scores, team A vs B)
+       ↓
+  Admin reviews and verifies match
+       ↓
+  Points auto-calculated per formula
+  and written to match_participants.points_earned
+       ↓
+  Leaderboard snapshot recomputed (nightly job)
+       ↓
+  User sees updated rank on /leaderboard
+       ↓
+  User gets notification: "+10 points from Cricket match"
+
+
+FLOW B — External traffic → Voucher purchase (Phase 3):
+
+  Partner shares link: championcircuit.com/vouchers?ref=TOKEN
+       ↓
+  User (not logged in) lands on voucher page
+  (city auto-filtered to partner's city)
+       ↓
+  Clicks "Buy now" → guest checkout
+  (enters email + phone only)
+       ↓
+  Pays via Razorpay (UPI/card/wallet)
+       ↓
+  Code + QR shown on screen
+  Email sent to buyer
+       ↓
+  User visits venue, shows QR
+  Venue scans → mark redeemed ✓
+       ↓
+  User later creates account → voucher
+  linked to their profile via email match
+
+
+FLOW C — Tournament journey:
+
+  Admin creates tournament
+  (or Venue creates → Admin approves)
+       ↓
+  Status: Registration Open
+       ↓
+  Players register (solo or team)
+  Pay entry fee if required
+       ↓
+  Status: Live
+       ↓
+  Matches played, venue records scores
+  Admin verifies each match
+       ↓
+  Status: Completed
+       ↓
+  Admin sets final positions
+  Prize amounts recorded
+       ↓
+  Points awarded to all participants
+  (registration pts + round pts + placement pts)
+       ↓
+  Leaderboard updated
+  Winners notified
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  LEADERBOARD POINTS FORMULA (draft)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  Base:
+    Tournament registration   →  1 pt
+    Casual match win          →  3 pts
+    Ranked match win          → 10 pts
+    Tournament round win      → 15 pts
+    Draw                      →  2 pts
+    Loss (participation)      →  1 pt
+
+  Placement bonus (tournament):
+    1st place                 → 50 pts
+    2nd place                 → 30 pts
+    3rd place                 → 15 pts
+
+  Multipliers:
+    × 1.5  verified venue match
+    × 1.2  opponent ranked higher than you (upset)
+    × 0.5  casual (unranked) match
+
+  Decay (keeps leaderboard fresh):
+    Points older than 90 days → × 0.8 weight in monthly board
+    All-time board has no decay

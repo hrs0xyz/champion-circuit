@@ -1,0 +1,339 @@
+3 types of logins:
+  1. User (player/fan)
+  2. Venue (turf owner / gaming club / listing manager)  
+  3. Admin (Champion Circuit staff — match control, scoring, vouchers)
+
+A "Venue" can offer multiple Listings:
+  - Himanshu Gaming Club → [Cricket pitch] [Badminton court] [PlayStation lounge]
+  - Each listing = 1 activity type (physical or esports)
+  - Each listing has up to 5 photos
+
+Users play at listings → match records → points → leaderboard
+
+Vouchers can be for anything (food, discount, free slot, merch)
+
+Leaderboard formula = TBD later, but data model must support it
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  IDENTITY & AUTH
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+users
+  id, username (unique, 4-16, letters/nums/_)
+  email (unique), hashed_password
+  auth_provider (password | google)
+  name, display_name
+  gender (male | female | non_binary | prefer_not_to_say)
+  date_of_birth
+  phone, phone_verified (bool)
+  avatar_url
+  bio (600 chars)
+  city, state, country, postal_code
+  interests[] → JSON array of sport/game slugs
+  ranked_interests[] → ordered preference
+  is_active, is_admin, is_verified
+  profile_edit_date, profile_edits_today
+  created_at, updated_at
+
+venues                         ← the "business" account
+  id
+  owner_user_id → users.id    ← the person who manages it
+  name, slug (unique)
+  description
+  logo_url
+  cover_url
+  phone, email, website
+  address_line1, address_line2
+  city, state, country, postal_code
+  lat, lng                    ← for map/proximity
+  is_verified (CC verified badge)
+  is_active
+  created_at, updated_at
+
+venue_admins                   ← multiple staff per venue
+  id
+  venue_id → venues.id
+  user_id → users.id
+  role (owner | manager | staff)
+  invited_at, accepted_at
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  LISTINGS (what a venue offers)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+listing_categories             ← seed data
+  id, slug, name
+  type (physical | esports | food | merchandise | service)
+  icon_url
+
+  Examples:
+    cricket, badminton, football, basketball, table_tennis
+    valorant, bgmi, pubg, fifa, free_fire, playstation, pc_gaming
+    food_beverages, merchandise, coaching
+
+listings                       ← one listing per activity
+  id
+  venue_id → venues.id
+  category_id → listing_categories.id
+  title                        ← "Cricket Turf A", "PS5 Gaming Pod"
+  description
+  rules
+  capacity                     ← max players at once
+  price_per_hour               ← 0 if free / membership
+  price_per_session
+  currency (INR default)
+  duration_minutes             ← default session length
+  is_bookable (bool)
+  is_tournament_eligible (bool)
+  is_active
+  created_at, updated_at
+
+listing_photos                 ← up to 5 per listing
+  id
+  listing_id → listings.id
+  url
+  caption
+  sort_order (1–5)
+  uploaded_at
+
+listing_amenities              ← tags like "floodlit", "AC", "wifi"
+  id
+  listing_id → listings.id
+  label
+
+listing_slots                  ← bookable time slots
+  id
+  listing_id → listings.id
+  day_of_week (0=Mon … 6=Sun) or specific date
+  start_time, end_time
+  max_bookings
+  is_blocked
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  BOOKINGS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+bookings
+  id
+  listing_id → listings.id
+  slot_id → listing_slots.id
+  user_id → users.id
+  booking_date
+  start_time, end_time
+  num_players
+  status (pending | confirmed | cancelled | completed | no_show)
+  payment_status (unpaid | paid | refunded)
+  amount_paid_paise
+  razorpay_order_id, razorpay_payment_id
+  notes
+  created_at
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  MATCHES & SCORING (the heart of leaderboard)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+matches
+  id
+  listing_id → listings.id
+  venue_id → venues.id
+  booking_id → bookings.id (nullable — can be walk-in)
+  match_type (casual | ranked | tournament)
+  game_mode (solo | duo | squad | team_vs_team)
+  status (scheduled | live | completed | cancelled | disputed)
+  played_at
+  duration_minutes
+  notes
+  created_by_user_id           ← who logged it
+  verified_by_admin_id         ← admin who confirmed score
+  verified_at
+  created_at
+
+match_participants             ← every player in a match
+  id
+  match_id → matches.id
+  user_id → users.id
+  team (A | B | none)          ← for team vs team
+  role (player | captain | substitute)
+  result (win | loss | draw | dnf)
+  score                        ← raw score (goals, kills, points)
+  rank                         ← finishing position
+  kills, assists, deaths        ← for esports
+  custom_stats → JSON          ← flexible: {wickets: 2, runs: 45}
+  points_earned                ← CC points from this match
+  is_disputed (bool)
+  created_at
+
+score_adjustments              ← admin can manually adjust
+  id
+  user_id → users.id
+  match_id → matches.id (nullable)
+  adjusted_by_admin_id → users.id
+  delta_points                 ← +/- amount
+  reason
+  created_at
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  LEADERBOARD SNAPSHOTS
+  (computed periodically, not live)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+leaderboard_snapshots
+  id
+  scope_type (global | city | venue | listing | category)
+  scope_id                     ← city name / venue_id / etc.
+  period_type (all_time | monthly | weekly)
+  period_key                   ← "2026-06" for monthly
+  user_id → users.id
+  rank
+  total_points
+  matches_played
+  wins, losses, draws
+  computed_at
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  TOURNAMENTS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+tournaments
+  id
+  listing_id → listings.id
+  venue_id → venues.id
+  name, slug
+  description, rules
+  game (from listing_categories slug)
+  format (knockout | double_elim | group_stage | group_knockout | round_robin)
+  mode (solo | duo | squad | team)
+  max_participants
+  entry_fee_paise
+  prize_pool_paise
+  prize_description
+  registration_open (bool)
+  registration_deadline
+  starts_at, ends_at
+  status (draft | registration | live | completed | cancelled)
+  is_exclusive (bool)
+  is_featured (bool)
+  banner_url
+  created_by → users.id
+  created_at
+
+tournament_registrations
+  id
+  tournament_id → tournaments.id
+  user_id → users.id
+  team_id → teams.id (nullable)
+  payment_status
+  razorpay_order_id
+  registered_at
+  seed_number                  ← for bracket seeding
+
+tournament_results
+  id
+  tournament_id → tournaments.id
+  user_id → users.id (or team_id)
+  position (1, 2, 3…)
+  points_earned
+  prize_won_paise
+  recorded_by_admin → users.id
+  recorded_at
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  TEAMS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+teams
+  id
+  name, tag (short tag like "CC-X")
+  logo_url
+  leader_user_id → users.id
+  city
+  category_id → listing_categories.id (what game/sport)
+  is_active
+  created_at
+
+team_members
+  id
+  team_id → teams.id
+  user_id → users.id
+  role (leader | co_leader | member | substitute)
+  joined_at
+
+team_invites
+  id
+  team_id → teams.id
+  invited_email
+  invited_user_id → users.id (nullable)
+  status (pending | accepted | declined | expired)
+  invited_at, responded_at
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  VOUCHERS (complete system)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+partners                       ← already built, keep as-is
+voucher_listings               ← already built, keep as-is
+  value_type:
+    discount_inr | free_slot | free_entry
+    free_food | merchandise | coaching_session | custom
+voucher_orders                 ← already built
+issued_vouchers                ← already built
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  REVIEWS & RATINGS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+reviews
+  id
+  listing_id → listings.id
+  user_id → users.id
+  booking_id → bookings.id
+  rating (1–5)
+  comment (500 chars)
+  is_verified_visit (bool)     ← only if booking exists
+  created_at
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  NOTIFICATIONS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+notifications
+  id
+  user_id → users.id
+  type (booking_confirmed | match_recorded | tournament_result
+        voucher_issued | team_invite | score_adjusted | system)
+  title, body
+  link                         ← deep link URL
+  is_read (bool)
+  created_at
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  WAITLIST (already built)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+waitlist_entries               ← keep as-is
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  AUTH SUPPORT TABLES
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+email_otps                     ← already built, keep as-is
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  LEADERBOARD POINTS FORMULA (for later)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Base points per match result:
+  Win (ranked)     → 10 pts
+  Win (casual)     → 3 pts
+  Win (tournament) → 20 pts
+  Draw             → 2 pts
+  Loss             → 1 pt (participation)
+
+Multipliers:
+  × 1.5 if match_type = tournament
+  × 1.2 if opponent rank > yours (upset win)
+  × 1.0 city ranked match
+  + bonus for tournament position (1st=50, 2nd=30, 3rd=15)
+
+Admin override: score_adjustments table covers manual corrections
