@@ -1,31 +1,26 @@
-from pydantic import BaseModel, EmailStr, Field, HttpUrl, field_validator
+from pydantic import BaseModel, EmailStr, Field, field_validator
 
 
 INTERESTS = [
-    "Cricket",
-    "Badminton",
-    "Football",
-    "Basketball",
-    "Table Tennis",
-    "PUBG",
-    "BGMI",
-    "Valorant",
-    "Free Fire",
-    "FIFA",
-    "Content Creation",
-    "Fitness",
+    "Cricket", "Badminton", "Football", "Basketball", "Table Tennis",
+    "PUBG", "BGMI", "Valorant", "Free Fire", "FIFA",
+    "Content Creation", "Fitness", "Basketball 3x3", "Kabaddi",
+    "Chess", "Carrom", "PlayStation", "PC Gaming",
 ]
 
 
 class ProfilePayload(BaseModel):
     name: str = Field(default="", max_length=120)
+    display_name: str = Field(default="", max_length=120)
+    gender: str = Field(default="", max_length=30)
+    date_of_birth: str = Field(default="", max_length=10)
+    phone: str = Field(default="", max_length=20)
     city: str = Field(default="", max_length=120)
+    state: str = Field(default="", max_length=120)
     postal_code: str = Field(default="", max_length=20)
-    interests: list[str] = Field(default_factory=list, max_length=12)
-    ranked_interests: list[str] = Field(default_factory=list, max_length=12)
+    interests: list[str] = Field(default_factory=list)
+    ranked_interests: list[str] = Field(default_factory=list)
     bio: str = Field(default="", max_length=600)
-    avatar_url: HttpUrl | None = None
-    photo_url: HttpUrl | None = None
 
 
 class SignupStartRequest(BaseModel):

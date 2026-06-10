@@ -18,7 +18,7 @@ def _load(value: str) -> list[str]:
     try:
         parsed = json.loads(value)
         return parsed if isinstance(parsed, list) else []
-    except json.JSONDecodeError:
+    except (json.JSONDecodeError, TypeError):
         return []
 
 
@@ -28,7 +28,12 @@ def serialize_user(user: User) -> dict:
         "username": user.username,
         "email": user.email,
         "name": user.name,
+        "display_name": user.display_name,
+        "gender": user.gender,
+        "date_of_birth": user.date_of_birth,
+        "phone": user.phone,
         "city": user.city,
+        "state": user.state,
         "postal_code": user.postal_code,
         "interests": _load(user.interests),
         "ranked_interests": _load(user.ranked_interests),
@@ -37,6 +42,8 @@ def serialize_user(user: User) -> dict:
         "photo_url": user.photo_url,
         "auth_provider": user.auth_provider,
         "is_admin": user.is_admin,
+        "is_verified": user.is_verified,
+        "is_venue_owner": user.is_venue_owner,
         "created_at": user.created_at,
         "profile_edit_date": user.profile_edit_date,
         "profile_edits_today": user.profile_edits_today,
@@ -66,7 +73,7 @@ def create_signup_otp(db: Session, payload: SignupStartRequest) -> str:
     code = f"{random.randint(100000, 999999)}"
     email = payload.email.lower()
     username = payload.username.lower()
-    db.query(EmailOtp).filter(EmailOtp.email == email, EmailOtp.consumed == False).update({"consumed": True})
+    db.query(EmailOtp).filter(EmailOtp.email == email, EmailOtp.consumed == False).update({"consumed": True})  # noqa: E712
     otp = EmailOtp(
         email=email,
         username=username,
@@ -82,7 +89,7 @@ def create_signup_otp(db: Session, payload: SignupStartRequest) -> str:
 
 def create_password_reset_otp(db: Session, user: User) -> str:
     code = f"{random.randint(100000, 999999)}"
-    db.query(EmailOtp).filter(EmailOtp.email == user.email, EmailOtp.consumed == False).update({"consumed": True})
+    db.query(EmailOtp).filter(EmailOtp.email == user.email, EmailOtp.consumed == False).update({"consumed": True})  # noqa: E712
     otp = EmailOtp(
         email=user.email,
         username=user.username,
@@ -99,7 +106,7 @@ def create_password_reset_otp(db: Session, user: User) -> str:
 def reset_password_with_otp(db: Session, user: User, code: str, new_password: str) -> bool:
     otp = (
         db.query(EmailOtp)
-        .filter(EmailOtp.email == user.email, EmailOtp.consumed == False)
+        .filter(EmailOtp.email == user.email, EmailOtp.consumed == False)  # noqa: E712
         .order_by(EmailOtp.created_at.desc())
         .first()
     )
@@ -125,7 +132,7 @@ def reset_password_with_otp(db: Session, user: User, code: str, new_password: st
 def consume_signup_otp(db: Session, email: str, code: str) -> User | None:
     otp = (
         db.query(EmailOtp)
-        .filter(EmailOtp.email == email.lower(), EmailOtp.consumed == False)
+        .filter(EmailOtp.email == email.lower(), EmailOtp.consumed == False)  # noqa: E712
         .order_by(EmailOtp.created_at.desc())
         .first()
     )
@@ -150,9 +157,6 @@ def consume_signup_otp(db: Session, email: str, code: str) -> User | None:
         username=otp.username,
         hashed_password=otp.hashed_password,
         auth_provider="password",
-        name="",
-        city="",
-        postal_code="",
     )
     otp.consumed = True
     db.add(user)
@@ -161,30 +165,14 @@ def consume_signup_otp(db: Session, email: str, code: str) -> User | None:
     return user
 
 
-def create_password_user(db: Session, payload: SignupStartRequest) -> User:
-    user = User(
-        email=payload.email.lower(),
-        username=payload.username.lower(),
-        hashed_password=hash_password(payload.password),
-        auth_provider="password",
-        name="",
-        city="",
-        postal_code="",
-    )
-    db.add(user)
-    db.commit()
-    db.refresh(user)
-    return user
-
-
 def available_google_username(db: Session, email: str) -> str:
     base = email.split("@", 1)[0].lower()
-    base = "".join(ch for ch in base if ch.isalnum() or ch in "._").strip("._")[:18] or "champion"
+    base = "".join(ch for ch in base if ch.isalnum() or ch == "_").strip("_")[:16] or "champion"
     username = base
     suffix = 1
     while get_user_by_username(db, username):
         suffix += 1
-        username = f"{base[:18]}{suffix}"
+        username = f"{base[:14]}{suffix}"
     return username
 
 
@@ -203,8 +191,6 @@ def upsert_google_user(db: Session, email: str, name: str = "", avatar_url: str 
             auth_provider="google",
             hashed_password=None,
             name=name,
-            city="",
-            postal_code="",
             avatar_url=avatar_url,
         )
         db.add(user)
@@ -220,20 +206,16 @@ def authenticate_user(db: Session, identifier: str, password: str) -> User | Non
     return user if verify_password(password, user.hashed_password) else None
 
 
-def profile_fields(payload: ProfilePayload) -> dict:
-    ranked = payload.ranked_interests or payload.interests
-    return {
-        "name": payload.name,
-        "city": payload.city,
-        "postal_code": payload.postal_code,
-        "interests": _dump(payload.interests),
-        "ranked_interests": _dump(ranked),
-        "bio": payload.bio,
-        "avatar_url": str(payload.avatar_url or ""),
-        "photo_url": str(payload.photo_url or ""),
-    }
-
-
 def apply_profile(user: User, payload: ProfilePayload) -> None:
-    for key, value in profile_fields(payload).items():
-        setattr(user, key, value)
+    ranked = payload.ranked_interests or payload.interests
+    user.name = payload.name
+    user.display_name = payload.display_name
+    user.gender = payload.gender
+    user.date_of_birth = payload.date_of_birth
+    user.phone = payload.phone
+    user.city = payload.city
+    user.state = payload.state
+    user.postal_code = payload.postal_code
+    user.interests = json.dumps(payload.interests)
+    user.ranked_interests = json.dumps(ranked)
+    user.bio = payload.bio
