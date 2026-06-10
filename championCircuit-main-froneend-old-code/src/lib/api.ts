@@ -45,7 +45,12 @@ export interface UserRead {
   username: string;
   email: string;
   name: string;
+  display_name: string;
+  gender: string;
+  date_of_birth: string;
+  phone: string;
   city: string;
+  state: string;
   postal_code: string;
   interests: string[];
   ranked_interests: string[];
@@ -54,6 +59,8 @@ export interface UserRead {
   photo_url: string;
   auth_provider: string;
   is_admin: boolean;
+  is_verified: boolean;
+  is_venue_owner: boolean;
   created_at: string;
   profile_edit_date: string;
   profile_edits_today: number;

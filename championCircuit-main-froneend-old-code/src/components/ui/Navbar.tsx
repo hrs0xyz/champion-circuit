@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+import { NotificationBell } from './NotificationBell';
 
 const MOBILE_MENU_ID = 'site-mobile-navigation';
 
@@ -9,6 +10,7 @@ const publicLinks = [
   { to: '/esports', label: 'Esports' },
   { to: '/vouchers', label: 'Vouchers' },
   { to: '/leaderboard', label: 'Leaderboard' },
+  { to: '/news', label: 'News' },
   { to: '/about', label: 'About' },
 ] as const;
 
@@ -93,6 +95,7 @@ export function Navbar({ variant }: NavbarProps) {
             </div>
           ) : (
             <div className="nav-user-menu" ref={menuRef}>
+              <NotificationBell />
               <button
                 type="button"
                 className="nav-avatar"
@@ -116,6 +119,12 @@ export function Navbar({ variant }: NavbarProps) {
                   </Link>
                   <Link to="/bookings" role="menuitem" onClick={() => setMenuOpen(false)}>
                     My Bookings
+                  </Link>
+                  <Link to="/my-matches" role="menuitem" onClick={() => setMenuOpen(false)}>
+                    My Matches
+                  </Link>
+                  <Link to="/my-vouchers" role="menuitem" onClick={() => setMenuOpen(false)}>
+                    My Vouchers
                   </Link>
                   <button type="button" role="menuitem" onClick={handleSignOut}>
                     Logout
