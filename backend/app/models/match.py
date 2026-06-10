@@ -187,6 +187,30 @@ class Tournament(Base):
     )
 
 
+# ── Tournament admin assignments ──────────────────────────────────────────────
+
+class TournamentAdmin(Base):
+    """
+    Super admin or turf owner assigns a user as match admin for a tournament.
+    That user can then edit scores, verify matches, manage participants for that tournament.
+    """
+    __tablename__ = "tournament_admins"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    tournament_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("tournaments.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    user_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    assigned_by: Mapped[int] = mapped_column(
+        Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
 class TournamentRegistration(Base):
     __tablename__ = "tournament_registrations"
 

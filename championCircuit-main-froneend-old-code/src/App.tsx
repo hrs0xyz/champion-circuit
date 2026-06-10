@@ -34,6 +34,12 @@ import { AdminLeaderboardPage } from './pages/admin/AdminLeaderboardPage';
 import { AdminUsersPage } from './pages/admin/AdminUsersPage';
 import { AdminContentPage } from './pages/admin/AdminContentPage';
 
+// Staff portals — hidden, full-screen, no public navbar
+import { StaffLoginPage } from './pages/staff/StaffLoginPage';
+import { SuperAdminPage } from './pages/staff/SuperAdminPage';
+import { TurfOwnerPage } from './pages/staff/TurfOwnerPage';
+import { MatchAdminPage } from './pages/staff/MatchAdminPage';
+
 export default function App() {
   return (
     <BrowserRouter>
@@ -41,7 +47,14 @@ export default function App() {
         <CityProvider>
           <PlatformProvider>
             <Routes>
-              {/* Public */}
+
+              {/* ── Staff portals (no public layout, full screen) ── */}
+              <Route path="staff-login" element={<StaffLoginPage />} />
+              <Route path="staff/admin" element={<SuperAdminPage />} />
+              <Route path="staff/venue" element={<TurfOwnerPage />} />
+              <Route path="staff/match" element={<MatchAdminPage />} />
+
+              {/* ── Public pages with navbar ── */}
               <Route element={<PublicLayout />}>
                 <Route index element={<LandingPage />} />
                 <Route path="about" element={<AboutPage />} />
@@ -50,27 +63,22 @@ export default function App() {
                 <Route path="register" element={<Navigate to="/signup" replace />} />
                 <Route path="forgot-password" element={<ForgotPasswordPage />} />
 
-                {/* Turf */}
                 <Route path="turf" element={<TurfBrowsePage />} />
                 <Route path="venue/:id" element={<VenueDetailPage />} />
 
-                {/* Esports */}
                 <Route path="esports" element={<EsportsBrowsePage />} />
                 <Route path="esports/tournament/:id" element={<EsportsTournamentPage />} />
 
-                {/* Leaderboard */}
                 <Route path="leaderboard" element={<LeaderboardPage />} />
 
-                {/* Vouchers */}
                 <Route path="vouchers" element={<VouchersPage />} />
                 <Route path="my-voucher" element={<MyVoucherPage />} />
 
-                {/* News */}
                 <Route path="news" element={<NewsPage />} />
                 <Route path="news/:id" element={<NewsArticlePage />} />
               </Route>
 
-              {/* Authenticated */}
+              {/* ── Authenticated user pages ── */}
               <Route element={<RequireAuth><AppLayout /></RequireAuth>}>
                 <Route path="profile" element={<ProfilePage />} />
                 <Route path="bookings" element={<BookingsPage />} />
@@ -78,7 +86,7 @@ export default function App() {
                 <Route path="my-vouchers" element={<MyVoucherPage />} />
               </Route>
 
-              {/* Admin */}
+              {/* ── Old admin panel (legacy) ── */}
               <Route path="admin/login" element={<AdminLoginPage />} />
               <Route element={<RequireAdmin><AdminLayout /></RequireAdmin>}>
                 <Route path="admin" element={<AdminDashboardPage />} />
@@ -91,6 +99,7 @@ export default function App() {
 
               <Route path="platform" element={<Navigate to="/turf" replace />} />
               <Route path="*" element={<Navigate to="/" replace />} />
+
             </Routes>
           </PlatformProvider>
         </CityProvider>

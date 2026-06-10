@@ -4,7 +4,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
-from app.api.routes import auth, health, matches, uploads, users, venues, vouchers
+from app.api.routes import admin, auth, health, matches, uploads, users, venues, vouchers
 from app.core.config import settings
 from app.db.migrations import ensure_dev_schema
 from app.db.session import Base, engine
@@ -35,6 +35,7 @@ app = FastAPI(
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origins,
+    allow_origin_regex=r"http://127\.0\.0\.1:\d+|http://localhost:\d+",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -48,6 +49,7 @@ app.include_router(uploads.router,  prefix="/api/uploads",  tags=["uploads"])
 app.include_router(venues.router,   prefix="/api",          tags=["venues"])
 app.include_router(matches.router,  prefix="/api",          tags=["matches & tournaments"])
 app.include_router(vouchers.router, prefix="/api",          tags=["vouchers"])
+app.include_router(admin.router,    prefix="/api",          tags=["staff portal"])
 
 # ── Static file serving ───────────────────────────────────────────────────────
 app.mount("/uploads", StaticFiles(directory=settings.UPLOAD_DIR), name="uploads")
