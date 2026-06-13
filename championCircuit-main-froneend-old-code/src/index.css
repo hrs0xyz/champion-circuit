@@ -1,31 +1,45 @@
 @import url('https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,300;6..72,400;6..72,500;6..72,600;6..72,700&family=DM+Sans:wght@300;400;500&display=swap');
 
 :root {
-  --navy-deep: #000000;
-  --navy: #080808;
-  --navy-soft: #121212;
-  --accent: #ffffff;
-  --accent-dim: #a3a3a3;
-  --accent-glow: rgba(255, 255, 255, 0.22);
-  --gradient-mix: linear-gradient(135deg, #ffffff 0%, #c8c8c8 48%, #525252 100%);
-  --gradient-mix-soft: linear-gradient(180deg, rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0.02) 100%);
-  --gold: #ffffff;
-  --gold-dim: #c2c2c2;
-  --silver: #ffffff;
-  --silver-muted: #b8b8b8;
-  --text: #f5f5f5;
-  --text-muted: rgba(245, 245, 245, 0.66);
-  --stroke: rgba(245, 245, 245, 0.22);
-  --glass: rgba(0, 0, 0, 0.78);
+  /* ── Core background palette ── */
+  --navy-deep: #060d1a;
+  --navy: #0a1628;
+  --navy-soft: #0f1f35;
+
+  /* ── Cyan/teal accent (Gigaplay-inspired) ── */
+  --accent: #0abfbc;
+  --accent-dim: #087f7d;
+  --accent-glow: rgba(10, 191, 188, 0.28);
+  --accent-bright: #1de9e6;
+
+  /* ── Gradients ── */
+  --gradient-mix: linear-gradient(135deg, #1de9e6 0%, #0abfbc 48%, #087f7d 100%);
+  --gradient-mix-soft: linear-gradient(180deg, rgba(10,191,188,0.12) 0%, rgba(10,191,188,0.02) 100%);
+
+  /* ── Legacy aliases kept for compatibility ── */
+  --gold: #0abfbc;
+  --gold-dim: #087f7d;
+  --silver: #e0f7f7;
+  --silver-muted: #a0d4d4;
+
+  /* ── Text ── */
+  --text: #e8f4f4;
+  --text-muted: rgba(200, 235, 235, 0.65);
+  --stroke: rgba(10, 191, 188, 0.22);
+
+  /* ── UI ── */
+  --glass: rgba(6, 13, 26, 0.85);
   --shadow: 0 24px 80px rgba(0, 0, 0, 0.7);
   --radius: 18px;
   --radius-sm: 12px;
   --font: 'Newsreader', Georgia, serif;
   --font-body: 'DM Sans', system-ui, sans-serif;
-  --status-live: #4ade80;
-  --status-upcoming: #e5e5e5;
-  --status-completed: #a3a3a3;
-  --status-exclusive: #fafafa;
+
+  /* ── Status colors ── */
+  --status-live: #0abfbc;
+  --status-upcoming: #e0f7f7;
+  --status-completed: #a0d4d4;
+  --status-exclusive: #1de9e6;
 }
 
 *,
@@ -38,14 +52,14 @@ html {
   scroll-behavior: smooth;
   -webkit-text-size-adjust: 100%;
   text-size-adjust: 100%;
-  background-color: #000;
+  background-color: #060d1a;
 }
 
 body {
   margin: 0;
   font-family: var(--font-body);
   color: var(--text);
-  background: linear-gradient(185deg, #030303 0%, #090909 45%, #000000 100%);
+  background: linear-gradient(185deg, #060d1a 0%, #0a1628 45%, #060d1a 100%);
   min-height: 100vh;
   min-height: 100dvh;
   min-height: 100svh;
@@ -107,7 +121,7 @@ a:hover {
 .aurora--gold {
   width: min(90vw, 720px);
   height: min(90vw, 720px);
-  background: radial-gradient(circle, rgba(255, 255, 255, 0.24) 0%, transparent 68%);
+  background: radial-gradient(circle, rgba(10, 191, 188, 0.18) 0%, transparent 68%);
   top: -18%;
   left: -12%;
   animation-delay: 0s;
@@ -116,7 +130,7 @@ a:hover {
 .aurora--blue {
   width: min(85vw, 640px);
   height: min(85vw, 640px);
-  background: radial-gradient(circle, rgba(210, 210, 210, 0.18) 0%, transparent 70%);
+  background: radial-gradient(circle, rgba(8, 127, 125, 0.14) 0%, transparent 70%);
   bottom: 10%;
   right: -20%;
   animation-delay: -7s;
@@ -126,7 +140,7 @@ a:hover {
 .aurora--silver {
   width: min(70vw, 520px);
   height: min(70vw, 520px);
-  background: radial-gradient(circle, rgba(255, 255, 255, 0.08) 0%, transparent 72%);
+  background: radial-gradient(circle, rgba(10, 191, 188, 0.07) 0%, transparent 72%);
   top: 38%;
   left: 35%;
   animation-delay: -12s;
@@ -170,11 +184,11 @@ a:hover {
   gap: 10px;
   padding: 7px 8px 7px 10px;
   border-radius: 20px;
-  background: rgba(0, 0, 0, 0.84);
+  background: rgba(6, 13, 26, 0.92);
   backdrop-filter: blur(28px) saturate(1.85);
   -webkit-backdrop-filter: blur(28px) saturate(1.85);
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(10, 191, 188, 0.18);
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(10, 191, 188, 0.05);
 }
 
 .brand {
@@ -596,15 +610,16 @@ a:hover {
 }
 
 .btn-primary {
-  background: #ffffff;
-  color: #000000;
-  border-color: #ffffff;
-  box-shadow: none;
+  background: var(--accent);
+  color: #060d1a;
+  border-color: var(--accent);
+  box-shadow: 0 0 20px rgba(10, 191, 188, 0.3);
 }
 
 .btn-primary:hover {
-  background: #e8e8e8;
-  border-color: #e8e8e8;
+  background: var(--accent-bright);
+  border-color: var(--accent-bright);
+  box-shadow: 0 0 28px rgba(10, 191, 188, 0.45);
 }
 
 .btn-secondary {
@@ -5854,3 +5869,218 @@ a.contact-item:hover {
   .staff-sidebar__brand { width: 100%; }
   .staff-nav-btn { width: auto; }
 }
+
+/* ─── Sport filter chips (Turf page) ────────────────────────────────────── */
+
+.sport-filter-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 16px 0 4px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.sport-filter-row::-webkit-scrollbar { display: none; }
+
+.sport-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 14px;
+  border-radius: 999px;
+  background: rgba(10, 191, 188, 0.06);
+  border: 1px solid rgba(10, 191, 188, 0.15);
+  color: var(--text-muted);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  font-family: var(--font-body);
+  white-space: nowrap;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+.sport-chip:hover {
+  background: rgba(10, 191, 188, 0.12);
+  border-color: rgba(10, 191, 188, 0.35);
+  color: var(--text);
+}
+.sport-chip--active {
+  background: rgba(10, 191, 188, 0.18);
+  border-color: var(--accent);
+  color: var(--accent-bright);
+  font-weight: 700;
+  box-shadow: 0 0 12px rgba(10, 191, 188, 0.2);
+}
+.sport-chip__icon { font-size: 15px; line-height: 1; }
+
+/* ─── Venue card v2 ──────────────────────────────────────────────────────── */
+
+.venue-card-v2 {
+  display: flex;
+  flex-direction: column;
+  border-radius: var(--radius);
+  overflow: hidden;
+  background: rgba(10, 22, 40, 0.92);
+  border: 1px solid rgba(10, 191, 188, 0.12);
+  cursor: pointer;
+  transition: border-color 0.2s, box-shadow 0.2s, transform 0.2s;
+}
+.venue-card-v2:hover {
+  border-color: rgba(10, 191, 188, 0.4);
+  box-shadow: 0 8px 32px rgba(10, 191, 188, 0.15);
+  transform: translateY(-2px);
+}
+
+.venue-card-v2__cover {
+  position: relative;
+  aspect-ratio: 16/9;
+  overflow: hidden;
+  background: #060d1a;
+}
+.venue-card-v2__cover-img { width: 100%; height: 100%; object-fit: cover; display: block; transition: transform 0.4s ease; }
+.venue-card-v2:hover .venue-card-v2__cover-img { transform: scale(1.04); }
+.venue-card-v2__cover-placeholder { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; font-size: 52px; }
+.venue-card-v2__verified {
+  position: absolute; top: 10px; right: 10px;
+  padding: 3px 10px; border-radius: 999px;
+  background: rgba(10, 191, 188, 0.18);
+  border: 1px solid rgba(10, 191, 188, 0.4);
+  color: var(--accent-bright);
+  font-size: 11px; font-weight: 700;
+}
+.venue-card-v2__sport-badge {
+  position: absolute; top: 10px; left: 10px;
+  padding: 3px 10px; border-radius: 999px;
+  background: rgba(6, 13, 26, 0.85);
+  border: 1px solid rgba(10, 191, 188, 0.3);
+  color: var(--accent);
+  font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em;
+}
+
+.venue-card-v2__body { padding: 16px 18px 18px; display: flex; flex-direction: column; gap: 10px; }
+.venue-card-v2__header { display: flex; align-items: center; gap: 10px; }
+.venue-card-v2__logo { width: 38px; height: 38px; border-radius: 8px; object-fit: contain; background: rgba(10,191,188,0.08); border: 1px solid rgba(10,191,188,0.15); flex-shrink: 0; }
+.venue-card-v2__info { min-width: 0; }
+.venue-card-v2__name { font-size: 16px; font-weight: 700; margin: 0 0 2px; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.venue-card-v2__location { font-size: 12px; color: var(--text-muted); margin: 0; }
+.venue-card-v2__desc { font-size: 13px; color: var(--text-muted); margin: 0; line-height: 1.6; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.venue-card-v2__footer { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 4px; }
+.venue-card-v2__actions { display: flex; gap: 8px; }
+.venue-card-v2__action-btn {
+  width: 34px; height: 34px; border-radius: 8px;
+  background: rgba(10,191,188,0.08);
+  border: 1px solid rgba(10,191,188,0.18);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 16px; cursor: pointer; text-decoration: none;
+  transition: background 0.15s, border-color 0.15s;
+}
+.venue-card-v2__action-btn:hover { background: rgba(10,191,188,0.18); border-color: rgba(10,191,188,0.4); }
+
+/* ─── Floating notifications (bottom-right) ─────────────────────────────── */
+
+.float-notif {
+  position: fixed;
+  bottom: 28px;
+  right: 28px;
+  z-index: 400;
+}
+
+.float-notif__btn {
+  position: relative;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: rgba(10, 22, 40, 0.95);
+  border: 1px solid rgba(10, 191, 188, 0.35);
+  box-shadow: 0 4px 20px rgba(10, 191, 188, 0.2);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: box-shadow 0.2s, border-color 0.2s;
+}
+.float-notif__btn:hover {
+  border-color: var(--accent);
+  box-shadow: 0 4px 24px rgba(10, 191, 188, 0.35);
+}
+.float-notif__icon { font-size: 20px; line-height: 1; }
+.float-notif__badge {
+  position: absolute; top: -4px; right: -4px;
+  min-width: 18px; height: 18px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: #060d1a;
+  font-size: 10px; font-weight: 800;
+  display: flex; align-items: center; justify-content: center;
+  padding: 0 4px;
+  border: 2px solid #060d1a;
+}
+
+.float-notif__panel {
+  position: absolute;
+  bottom: 56px;
+  right: 0;
+  width: 300px;
+  max-height: 360px;
+  overflow-y: auto;
+  background: rgba(10, 22, 40, 0.98);
+  border: 1px solid rgba(10, 191, 188, 0.25);
+  border-radius: 16px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5), 0 0 24px rgba(10,191,188,0.1);
+  animation: modal-in 0.2s ease-out both;
+}
+.float-notif__header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 12px 16px; border-bottom: 1px solid rgba(10,191,188,0.1);
+  font-size: 13px; font-weight: 700; color: var(--accent);
+}
+.float-notif__close { background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 13px; padding: 2px 4px; }
+.float-notif__empty { padding: 20px 16px; font-size: 13px; color: var(--text-muted); text-align: center; margin: 0; }
+.float-notif__list { display: flex; flex-direction: column; }
+.float-notif__item { padding: 12px 16px; border-bottom: 1px solid rgba(10,191,188,0.06); cursor: default; transition: background 0.15s; }
+.float-notif__item[role="button"] { cursor: pointer; }
+.float-notif__item[role="button"]:hover { background: rgba(10,191,188,0.05); }
+.float-notif__item--unread { border-left: 3px solid var(--accent); padding-left: 13px; background: rgba(10,191,188,0.04); }
+.float-notif__item-title { margin: 0 0 3px; font-size: 13px; font-weight: 700; color: var(--text); }
+.float-notif__item-body { margin: 0 0 4px; font-size: 12px; color: var(--text-muted); line-height: 1.5; }
+.float-notif__item-time { margin: 0; font-size: 11px; }
+
+/* ─── Accent color overrides on key elements ─────────────────────────────── */
+
+/* Nav active link */
+.nav-glass .nav-link.is-active {
+  color: var(--accent) !important;
+  background: rgba(10, 191, 188, 0.1);
+}
+
+/* City chip active */
+.city-chip--active {
+  background: rgba(10, 191, 188, 0.15);
+  border-color: var(--accent);
+  color: var(--accent-bright);
+  font-weight: 700;
+  box-shadow: 0 0 10px rgba(10,191,188,0.18);
+}
+
+/* Auth card border */
+.auth-card {
+  border-color: rgba(10, 191, 188, 0.18);
+}
+.auth-input:focus {
+  border-color: rgba(10, 191, 188, 0.5);
+  background: rgba(10, 191, 188, 0.05);
+  box-shadow: 0 0 0 3px rgba(10, 191, 188, 0.1);
+}
+
+/* Voucher value label */
+.voucher-card__value-label { color: var(--accent-bright); }
+.tournament-card-new__free { color: var(--accent-bright); }
+.listing-card__price { color: var(--accent-bright); }
+
+/* Lb my callout */
+.lb-my-callout { border-color: rgba(10,191,188,0.25); background: rgba(10,191,188,0.05); }
+.lb-my-callout__rank { color: var(--accent-bright); }
+
+/* Staff portal accent */
+.staff-nav-btn--active { background: rgba(10,191,188,0.12); color: var(--accent-bright); }
+.staff-badge--active { background: rgba(10,191,188,0.12); color: var(--accent-bright); }
+.staff-stat-card { border-color: rgba(10,191,188,0.12); background: rgba(10,191,188,0.04); }

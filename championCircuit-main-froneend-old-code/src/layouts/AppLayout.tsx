@@ -1,6 +1,7 @@
 import { Outlet } from 'react-router-dom';
 import { Navbar } from '../components/ui/Navbar';
 import { Footer } from '../components/ui/Footer';
+import { FloatingNotifications } from '../components/ui/FloatingNotifications';
 
 export function AppLayout() {
   return (
@@ -14,6 +15,7 @@ export function AppLayout() {
         <Outlet />
       </main>
       <Footer />
+      <FloatingNotifications />
     </div>
   );
 }
