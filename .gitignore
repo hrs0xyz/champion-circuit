@@ -20,10 +20,11 @@ __pycache__/
 *.egg-info/
 .eggs/
 
-# ── Database ──────────────────────────────────────────────────────────────────
-*.db
-*.sqlite
-*.sqlite3
+# ── Database — exclude production DBs but allow dev seed DB ──────────────────
+# Uncomment below to exclude ALL db files:
+# *.db
+# *.sqlite
+# *.sqlite3
 
 # ── Secrets — NEVER commit these ──────────────────────────────────────────────
 .env
@@ -33,9 +34,10 @@ __pycache__/
 *.key
 client_secret*.json
 
-# ── Uploads (user-generated content) ─────────────────────────────────────────
-backend/uploads/*
-!backend/uploads/.gitkeep
+# ── Uploads — include user avatars and listing photos ─────────────────────────
+# (uncomment below to exclude uploads if needed in production)
+# backend/uploads/*
+# !backend/uploads/.gitkeep
 
 # ── Build & misc ──────────────────────────────────────────────────────────────
 build/
@@ -45,3 +47,6 @@ prep.js
 prep_v2.js
 frontend-profile-check.png
 COMPLETE CODE.zip
+
+# ── KiroGraph index (local only) ─────────────────────────────────────────────
+.kirograph/

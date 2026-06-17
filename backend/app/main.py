@@ -4,7 +4,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
-from app.api.routes import admin, auth, health, matches, uploads, users, venues, vouchers
+from app.api.routes import admin, auth, health, matches, reviews, uploads, users, venues, vouchers, activity
 from app.core.config import settings
 from app.db.migrations import ensure_dev_schema
 from app.db.session import Base, engine
@@ -15,6 +15,7 @@ from app.models import venue as _venue_model        # noqa: F401
 from app.models import match as _match_model        # noqa: F401
 from app.models import voucher as _voucher_model    # noqa: F401
 from app.models import waitlist as _waitlist_model  # noqa: F401
+from app.models import activity as _activity_model  # noqa: F401
 
 # ── Create all tables (idempotent) ────────────────────────────────────────────
 Base.metadata.create_all(bind=engine)
@@ -50,6 +51,8 @@ app.include_router(venues.router,   prefix="/api",          tags=["venues"])
 app.include_router(matches.router,  prefix="/api",          tags=["matches & tournaments"])
 app.include_router(vouchers.router, prefix="/api",          tags=["vouchers"])
 app.include_router(admin.router,    prefix="/api",          tags=["staff portal"])
+app.include_router(reviews.router,  prefix="/api",          tags=["reviews"])
+app.include_router(activity.router, prefix="/api",          tags=["activity"])
 
 # ── Static file serving ───────────────────────────────────────────────────────
 app.mount("/uploads", StaticFiles(directory=settings.UPLOAD_DIR), name="uploads")

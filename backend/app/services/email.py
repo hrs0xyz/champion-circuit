@@ -245,3 +245,122 @@ def send_voucher_delivery_email(
     except Exception as exc:
         print(f"[EMAIL ERROR] Voucher delivery to {to_email}: {exc}")
         return False
+
+
+def send_welcome_email(to_email: str, username: str, name: str = "") -> bool:
+    """Send a welcome email after successful signup."""
+    display = name or username
+
+    if not settings.SMTP_HOST or not settings.SMTP_USERNAME or not settings.SMTP_PASSWORD:
+        print(f"[DEV WELCOME] Welcome email to {to_email} for @{username}")
+        return False
+
+    plain = (
+        f"Hey {display},\n\n"
+        f"Welcome to Champion Circuit! 🏆\n\n"
+        f"You're now part of a community built for serious players and passionate sports fans.\n\n"
+        f"Here's what you can do right now:\n"
+        f"  → Browse and book sports venues near you\n"
+        f"  → Filter by your sport — Cricket, Badminton, Football, Esports, and more\n"
+        f"  → Join or create tournaments\n"
+        f"  → Climb the leaderboard\n\n"
+        f"Your profile is live at: https://championcircuit.com/profile\n\n"
+        f"See you on the circuit.\n"
+        f"— The Champion Circuit Team\n"
+        f"contact@championcircuit.com"
+    )
+
+    html = f"""
+<!DOCTYPE html>
+<html>
+<body style="margin:0;padding:0;background:#060d1a;font-family:'DM Sans',system-ui,sans-serif;color:#e8f4f4;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;margin:40px auto;">
+    <!-- Header -->
+    <tr>
+      <td style="background:#0a1628;border:1px solid rgba(10,191,188,0.2);border-radius:16px 16px 0 0;padding:28px 32px 24px;text-align:center;border-bottom:none;">
+        <p style="margin:0;font-size:13px;font-weight:700;letter-spacing:0.18em;text-transform:uppercase;color:#0abfbc;">CHAMPION CIRCUIT</p>
+      </td>
+    </tr>
+    <!-- Hero -->
+    <tr>
+      <td style="background:#0a1628;border:1px solid rgba(10,191,188,0.2);border-left:1px solid rgba(10,191,188,0.2);border-right:1px solid rgba(10,191,188,0.2);border-top:none;border-bottom:none;padding:36px 32px 28px;">
+        <p style="margin:0 0 10px;font-size:28px;font-weight:800;color:#ffffff;line-height:1.2;">
+          Welcome to the circuit, {display}. 🏆
+        </p>
+        <p style="margin:0 0 28px;font-size:15px;color:rgba(232,244,244,0.65);line-height:1.7;">
+          You're now part of a community built for serious players, passionate fans, and future champions.
+        </p>
+
+        <!-- Feature list -->
+        <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:28px;">
+          <tr>
+            <td style="padding:10px 16px;background:rgba(10,191,188,0.06);border:1px solid rgba(10,191,188,0.15);border-radius:10px;margin-bottom:8px;display:block;">
+              <p style="margin:0;font-size:14px;color:#e8f4f4;">🏸 <strong>Book a turf</strong> — Find and reserve venues for Cricket, Badminton, Football, and more</p>
+            </td>
+          </tr>
+          <tr><td style="height:8px;"></td></tr>
+          <tr>
+            <td style="padding:10px 16px;background:rgba(10,191,188,0.06);border:1px solid rgba(10,191,188,0.15);border-radius:10px;">
+              <p style="margin:0;font-size:14px;color:#e8f4f4;">🎮 <strong>Esports pods</strong> — Book PS5, PC gaming, and more at partner venues</p>
+            </td>
+          </tr>
+          <tr><td style="height:8px;"></td></tr>
+          <tr>
+            <td style="padding:10px 16px;background:rgba(10,191,188,0.06);border:1px solid rgba(10,191,188,0.15);border-radius:10px;">
+              <p style="margin:0;font-size:14px;color:#e8f4f4;">🏆 <strong>Tournaments</strong> — Compete in city-level tournaments and climb the leaderboard</p>
+            </td>
+          </tr>
+          <tr><td style="height:8px;"></td></tr>
+          <tr>
+            <td style="padding:10px 16px;background:rgba(10,191,188,0.06);border:1px solid rgba(10,191,188,0.15);border-radius:10px;">
+              <p style="margin:0;font-size:14px;color:#e8f4f4;">🎟 <strong>Vouchers</strong> — Exclusive deals and discounts from partner venues</p>
+            </td>
+          </tr>
+        </table>
+
+        <!-- CTA -->
+        <table width="100%" cellpadding="0" cellspacing="0">
+          <tr>
+            <td style="text-align:center;">
+              <a href="https://championcircuit.com/turf"
+                 style="display:inline-block;background:#0abfbc;color:#060d1a;font-weight:700;font-size:15px;padding:14px 32px;border-radius:10px;text-decoration:none;letter-spacing:0.02em;">
+                Browse Venues →
+              </a>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+    <!-- Footer -->
+    <tr>
+      <td style="background:#060d1a;border:1px solid rgba(10,191,188,0.2);border-top:none;border-radius:0 0 16px 16px;padding:18px 32px;">
+        <p style="margin:0;font-size:12px;color:rgba(232,244,244,0.35);line-height:1.6;">
+          You received this because you signed up at Champion Circuit.<br>
+          &copy; 2026 Champion Circuit Private Limited &nbsp;·&nbsp;
+          <a href="mailto:contact@championcircuit.com" style="color:rgba(232,244,244,0.5);text-decoration:none;">contact@championcircuit.com</a>
+        </p>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+"""
+
+    message = EmailMessage()
+    message["Subject"] = f"Welcome to Champion Circuit, {display}! 🏆"
+    message["From"] = f"Champion Circuit <{settings.SMTP_FROM_EMAIL or settings.SMTP_USERNAME}>"
+    message["To"] = to_email
+    message.set_content(plain)
+    message.add_alternative(html, subtype="html")
+
+    try:
+        with smtplib.SMTP(settings.SMTP_HOST, settings.SMTP_PORT) as smtp:
+            smtp.ehlo()
+            smtp.starttls()
+            smtp.ehlo()
+            smtp.login(settings.SMTP_USERNAME, settings.SMTP_PASSWORD)
+            smtp.send_message(message)
+        return True
+    except Exception as exc:
+        print(f"[EMAIL ERROR] Welcome email to {to_email}: {exc}")
+        return False

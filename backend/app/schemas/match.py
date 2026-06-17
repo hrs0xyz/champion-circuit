@@ -1,5 +1,6 @@
-from pydantic import BaseModel, Field
-from typing import List
+from pydantic import BaseModel, Field, ConfigDict
+from typing import List, Optional
+from datetime import datetime
 
 
 # ── Match ─────────────────────────────────────────────────────────────────────
@@ -191,3 +192,25 @@ class NewsRead(BaseModel):
     is_published: bool
     published_at: str
     view_count: int
+
+
+# ── Review ────────────────────────────────────────────────────────────────────
+
+class ReviewCreate(BaseModel):
+    venue_id: int
+    rating: int = Field(..., ge=1, le=5)
+    comment: str = Field("", max_length=500)
+
+
+class ReviewRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    venue_id: Optional[int]
+    listing_id: Optional[int]
+    user_id: int
+    username: str
+    rating: int
+    comment: str
+    is_verified_visit: bool
+    created_at: datetime

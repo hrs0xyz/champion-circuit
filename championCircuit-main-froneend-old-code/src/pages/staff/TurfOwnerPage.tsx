@@ -217,7 +217,7 @@ function VenueBookings({ bookings }: { bookings: Record<string, unknown>[] }) {
   );
 }
 
-function VenueTournaments({ tournaments, onMsg, venueId }: { tournaments: Tournament[]; onMsg: (m: string) => void; venueId: number | null }) {
+function VenueTournaments({ tournaments, onMsg }: { tournaments: Tournament[]; onMsg: (m: string) => void; venueId: number | null }) {
   const [assigning, setAssigning] = useState<number | null>(null);
   const [username, setUsername] = useState('');
 

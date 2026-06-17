@@ -34,6 +34,7 @@ from app.services.users import (
     serialize_user,
     upsert_google_user,
 )
+from app.services.email import send_welcome_email
 
 router = APIRouter()
 
@@ -69,6 +70,11 @@ def signup_verify(payload: SignupVerifyRequest, db: Session = Depends(get_db)) -
     user = consume_signup_otp(db, payload.email, payload.otp)
     if not user:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid or expired OTP")
+    # Send welcome email (fire-and-forget — don't block on email failure)
+    try:
+        send_welcome_email(user.email, user.username, user.name or "")
+    except Exception:
+        pass
     return token_for(user)
 
 

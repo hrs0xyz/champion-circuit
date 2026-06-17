@@ -8,7 +8,7 @@ class Settings(BaseSettings):
     APP_NAME: str = "Champion Circuit API"
     ENVIRONMENT: str = "local"
     SECRET_KEY: str = Field(default="change-me-before-production")
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 #* 7  # 7 days
     DATABASE_URL: str = "sqlite:///./champion_circuit.db"
     BACKEND_CORS_ORIGINS: str = "http://localhost:5173,http://127.0.0.1:5173"
     GOOGLE_CLIENT_ID: str = ""

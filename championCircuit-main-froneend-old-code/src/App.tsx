@@ -33,6 +33,7 @@ import { AdminTournamentsPage } from './pages/admin/AdminTournamentsPage';
 import { AdminLeaderboardPage } from './pages/admin/AdminLeaderboardPage';
 import { AdminUsersPage } from './pages/admin/AdminUsersPage';
 import { AdminContentPage } from './pages/admin/AdminContentPage';
+import { ActivityLogPage } from './pages/admin/ActivityLogPage';
 
 // Staff portals — hidden, full-screen, no public navbar
 import { StaffLoginPage } from './pages/staff/StaffLoginPage';
@@ -95,6 +96,7 @@ export default function App() {
                 <Route path="admin/leaderboard" element={<AdminLeaderboardPage />} />
                 <Route path="admin/users" element={<AdminUsersPage />} />
                 <Route path="admin/content" element={<AdminContentPage />} />
+                <Route path="admin/activity" element={<ActivityLogPage />} />
               </Route>
 
               <Route path="platform" element={<Navigate to="/turf" replace />} />

@@ -115,6 +115,18 @@ export interface Notification {
   link: string; is_read: boolean; created_at: string;
 }
 
+export interface Review {
+  id: number;
+  venue_id: number;
+  listing_id: number | null;
+  user_id: number;
+  username: string;
+  rating: number;
+  comment: string;
+  is_verified_visit: boolean;
+  created_at: string;
+}
+
 // ── API calls ─────────────────────────────────────────────────────────────────
 
 export const ccApi = {
@@ -222,4 +234,9 @@ export const ccApi = {
     req<Notification[]>(`/api/notifications${unreadOnly ? '?unread_only=true' : ''}`),
   markNotificationsRead: () =>
     req<{ message: string }>('/api/notifications/read', { method: 'POST' }),
+
+  // Reviews
+  venueReviews: (venueId: number) => req<Review[]>(`/api/reviews?venue_id=${venueId}`),
+  submitReview: (payload: { venue_id: number; rating: number; comment: string }) =>
+    req<Review>('/api/reviews', { method: 'POST', body: JSON.stringify(payload) }),
 };

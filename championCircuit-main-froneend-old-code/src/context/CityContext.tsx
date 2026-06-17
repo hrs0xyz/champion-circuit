@@ -4,7 +4,7 @@
  * Persisted in localStorage.
  */
 import {
-  createContext, useCallback, useContext, useEffect,
+  createContext, useCallback, useContext,
   useMemo, useState, type ReactNode,
 } from 'react';
 

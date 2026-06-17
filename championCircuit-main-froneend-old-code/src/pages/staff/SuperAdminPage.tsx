@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { ccApi, type Venue, type Tournament, type NewsArticle } from '../../lib/ccApi';
 import { ApiError } from '../../lib/api';
+import { ActivityLogPage } from '../admin/ActivityLogPage';
 
 const BASE = import.meta.env.VITE_API_URL ?? 'http://127.0.0.1:8000';
 
@@ -24,7 +25,7 @@ async function adminReq<T>(path: string, init: RequestInit = {}): Promise<T> {
   return res.json() as Promise<T>;
 }
 
-type Tab = 'dashboard' | 'users' | 'venues' | 'tournaments' | 'news' | 'vouchers';
+type Tab = 'dashboard' | 'users' | 'venues' | 'tournaments' | 'news' | 'vouchers' | 'activity';
 
 interface Stats { total_users: number; total_venues: number; total_tournaments: number; total_matches: number; pending_matches: number; }
 interface UserRow { id: number; username: string; email: string; name: string; city: string; is_admin: boolean; is_venue_owner: boolean; is_active: boolean; }
@@ -48,14 +49,14 @@ export function SuperAdminPage() {
           <img src="/branding/cc-mark.png" alt="CC" width={32} />
           <span>Super Admin</span>
         </div>
-        {(['dashboard','users','venues','tournaments','news','vouchers'] as Tab[]).map((t) => (
+        {(['dashboard','users','venues','tournaments','news','vouchers','activity'] as Tab[]).map((t) => (
           <button
             key={t}
             type="button"
             className={`staff-nav-btn${tab === t ? ' staff-nav-btn--active' : ''}`}
             onClick={() => setTab(t)}
           >
-            {t.charAt(0).toUpperCase() + t.slice(1)}
+            {t === 'activity' ? '📊 Activity' : t.charAt(0).toUpperCase() + t.slice(1)}
           </button>
         ))}
         <button type="button" className="staff-nav-btn staff-nav-btn--logout"
@@ -70,6 +71,7 @@ export function SuperAdminPage() {
         {tab === 'tournaments' && <AdminTournaments />}
         {tab === 'news' && <AdminNews />}
         {tab === 'vouchers' && <AdminVouchersTab />}
+        {tab === 'activity' && <ActivityLogPage />}
       </main>
     </div>
   );
@@ -355,12 +357,11 @@ function AdminNews() {
 // ── Vouchers tab ──────────────────────────────────────────────────────────────
 function AdminVouchersTab() {
   const [vouchers, setVouchers] = useState<Array<Record<string, unknown>>>([]);
-  useEffect(() => { ccApi.voucherApi && ccApi.news('').then(() => {}).catch(() => {}); }, []);
 
   // Use ccApi browse
   useEffect(() => {
     import('../../lib/voucherApi').then(({ voucherApi }) => {
-      voucherApi.browse().then(setVouchers).catch(() => {});
+      voucherApi.browse().then((data) => setVouchers(data as Array<Record<string, unknown>>)).catch(() => {});
     });
   }, []);
 

@@ -25,8 +25,9 @@ export function ProfilePage() {
   const fileRef = useRef<HTMLInputElement>(null);
   const [avatarUploading, setAvatarUploading] = useState(false);
 
-  // Edit form state
+  // Edit form state — initialized lazily so they always reflect latest user
   const [name, setName] = useState(user?.name ?? '');
+  const [phone, setPhone] = useState(user?.phone ?? '');
   const [city, setCity] = useState(user?.city ?? '');
   const [postalCode, setPostalCode] = useState(user?.postal_code ?? '');
   const [bio, setBio] = useState(user?.bio ?? '');
@@ -40,6 +41,7 @@ export function ProfilePage() {
 
   function startEdit() {
     setName(user!.name ?? '');
+    setPhone(user!.phone ?? '');
     setCity(user!.city ?? '');
     setPostalCode(user!.postal_code ?? '');
     setBio(user!.bio ?? '');
@@ -71,6 +73,7 @@ export function ProfilePage() {
     try {
       await api.updateProfile({
         name,
+        phone,
         city,
         postal_code: postalCode,
         interests,
@@ -115,8 +118,7 @@ export function ProfilePage() {
     }
   }
 
-  const editsLeft = user.profile_edits_today < 1 ? 1 : 0;
-  const canEdit = editsLeft > 0 || user.profile_edit_date !== new Date().toISOString().slice(0, 10);
+  const canEdit = user.profile_edits_today < 1 || user.profile_edit_date !== new Date().toISOString().slice(0, 10);
 
   return (
     <section className="section section-profile">
@@ -135,7 +137,8 @@ export function ProfilePage() {
             className="profile-avatar-change"
             onClick={() => fileRef.current?.click()}
             disabled={avatarUploading}
-            title="Change avatar"
+            title="Change photo"
+            aria-label="Change profile photo"
           >
             {avatarUploading ? '…' : '📷'}
           </button>
@@ -153,7 +156,8 @@ export function ProfilePage() {
           <div>
             <h1 className="profile-name">{user.name || user.username}</h1>
             <p className="profile-username">@{user.username}</p>
-            {user.city ? <p className="profile-city">{user.city}</p> : null}
+            {user.city ? <p className="profile-city">📍 {user.city}</p> : null}
+            {user.phone ? <p className="profile-phone">📞 {user.phone}</p> : null}
           </div>
           {!editing ? (
             <button
@@ -177,6 +181,12 @@ export function ProfilePage() {
               <span className="profile-view__label">Email</span>
               <span className="profile-view__value">{user.email}</span>
             </div>
+            {user.phone ? (
+              <div className="profile-view__row">
+                <span className="profile-view__label">Phone</span>
+                <span className="profile-view__value">{user.phone}</span>
+              </div>
+            ) : null}
             {user.bio ? (
               <div className="profile-view__row">
                 <span className="profile-view__label">Bio</span>
@@ -194,9 +204,7 @@ export function ProfilePage() {
                 <span className="profile-view__label">Interests</span>
                 <div className="profile-tags">
                   {user.interests.map((i) => (
-                    <span key={i} className="profile-tag">
-                      {i}
-                    </span>
+                    <span key={i} className="profile-tag">{i}</span>
                   ))}
                 </div>
               </div>
@@ -219,6 +227,18 @@ export function ProfilePage() {
                 onChange={(e) => setName(e.target.value)}
                 placeholder="Your full name"
                 maxLength={120}
+              />
+            </div>
+
+            <div className="auth-field">
+              <label className="auth-label">Phone number</label>
+              <input
+                className="auth-input"
+                type="tel"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                placeholder="+91 98765 43210"
+                maxLength={20}
               />
             </div>
 

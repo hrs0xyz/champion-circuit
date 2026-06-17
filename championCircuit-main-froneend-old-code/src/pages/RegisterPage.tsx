@@ -11,7 +11,7 @@ function safeNext(raw: string | null) {
 }
 
 export function RegisterPage() {
-  const { user, loading, signInWithGoogle } = useAuth();
+  const { user, loading } = useAuth();
   const { profile, setProfile, registered, completeRegistration, cloudStatus } = usePlatform();
   const [params] = useSearchParams();
   const navigate = useNavigate();
@@ -32,7 +32,7 @@ export function RegisterPage() {
             <h1>Register</h1>
             <p>Sign in first, then complete your Champion Circuit profile.</p>
           </div>
-          <button type="button" className="btn btn-primary" onClick={() => void signInWithGoogle()}>
+          <button type="button" className="btn btn-primary" onClick={() => navigate(`/login?next=${encodeURIComponent(next)}`)}>
             Continue with Google
           </button>
           <p className="auth-inline muted small">

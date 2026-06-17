@@ -72,3 +72,33 @@ def ensure_dev_schema() -> None:
                 conn.execute(
                     text("CREATE UNIQUE INDEX IF NOT EXISTS ix_users_username ON users (username)")
                 )
+
+        # ── reviews ────────────────────────────────────────────────────────────
+        if "reviews" in tables:
+            review_cols = {c["name"] for c in inspector.get_columns("reviews")}
+            if "venue_id" not in review_cols:
+                _add_column(conn, "reviews", "venue_id",
+                            "INTEGER REFERENCES venues(id) ON DELETE SET NULL")
+
+        # ── user_activity ──────────────────────────────────────────────────────
+        if "user_activity" not in tables:
+            conn.execute(text("""
+                CREATE TABLE user_activity (
+                    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id     INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                    username    VARCHAR(40) DEFAULT '',
+                    event       VARCHAR(60) NOT NULL,
+                    venue_id    INTEGER,
+                    venue_name  VARCHAR(200) DEFAULT '',
+                    sport       VARCHAR(60) DEFAULT '',
+                    city        VARCHAR(120) DEFAULT '',
+                    listing_id  INTEGER,
+                    listing_title VARCHAR(200) DEFAULT '',
+                    extra       VARCHAR(500) DEFAULT '',
+                    created_at  DATETIME DEFAULT CURRENT_TIMESTAMP
+                )
+            """))
+            conn.execute(text("CREATE INDEX ix_activity_user_id ON user_activity(user_id)"))
+            conn.execute(text("CREATE INDEX ix_activity_event ON user_activity(event)"))
+            conn.execute(text("CREATE INDEX ix_activity_venue_id ON user_activity(venue_id)"))
+            conn.execute(text("CREATE INDEX ix_activity_created_at ON user_activity(created_at)"))

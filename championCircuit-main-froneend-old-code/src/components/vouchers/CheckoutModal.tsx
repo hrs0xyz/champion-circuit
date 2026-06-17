@@ -33,7 +33,7 @@ export function CheckoutModal({ listing, partnerRef, isGuest, onClose, onSuccess
 
   const [email, setEmail] = useState(user?.email ?? '');
   const [name, setName] = useState(user?.name ?? '');
-  const [phone, setPhone] = useState('');
+  const [phone, setPhone] = useState(user?.phone ?? '');
   const [qty, setQty] = useState(1);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -138,7 +138,7 @@ export function CheckoutModal({ listing, partnerRef, isGuest, onClose, onSuccess
               onChange={(e) => setName(e.target.value)} placeholder="Your name" maxLength={120} />
           </div>
           <div className="auth-field">
-            <label className="auth-label">Phone (optional)</label>
+            <label className="auth-label">Phone</label>
             <input className="auth-input" type="tel" value={phone}
               onChange={(e) => setPhone(e.target.value)} placeholder="+91 98765 43210" maxLength={20} />
           </div>

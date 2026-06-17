@@ -1,0 +1,570 @@
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  CHAMPION CIRCUIT — COMPLETE CURRENT USER FLOW DIAGRAM
+  Updated: June 2026 | Version: 2.0
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+┌─────────────────────────────────────────────────────────────────────┐
+│                    ENTRY POINTS                                      │
+│   championcircuit.com  |  /turf  |  /esports  |  /vouchers          │
+│   /news  |  /leaderboard  |  /my-voucher                            │
+└──────────────────────────────┬──────────────────────────────────────┘
+                               │
+               ┌───────────────┴────────────────┐
+               │                                │
+               ▼                                ▼
+        [ NOT LOGGED IN ]               [ LOGGED IN ]
+               │                                │
+    ┌──────────┴──────────┐          Full access to all
+    │                     │          features below
+    ▼                     ▼
+[ Sign Up ]           [ Log In ]
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  SIGN UP FLOW
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  /signup
+    │
+    ├── Enter username (4–16 chars, alphanumeric + underscore)
+    │     Real-time availability check ✓/✗
+    ├── Enter email
+    ├── Enter password (min 8 chars)
+    │
+    ▼
+  OTP sent to email (6-digit, expires 10 min)
+  [dev mode: OTP shown in console]
+    │
+    ▼
+  Verify OTP (6 input boxes, auto-submit)
+    │
+    ▼
+  Account created ✓
+    │
+    ├── Welcome email sent automatically (HTML + plain text)
+    │     Subject: "Welcome to Champion Circuit, {name}! 🏆"
+    │     Contains: feature overview + Browse Venues CTA
+    │
+    ▼
+  Redirect → /turf (auto city-set from profile if set)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  LOGIN FLOW
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  /login
+    ├── Email or username + password
+    ├── "Forgot password?" link
+    │     → Enter email/username
+    │     → OTP sent to email
+    │     → Enter OTP + new password
+    │     → Redirect back to login
+    └── Google Sign-in (if configured)
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  NAVIGATION BAR (logged in)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  CC Logo | Turf | Esports | Vouchers | Leaderboard | News | About
+                                                  [🔔 Bell] [Avatar → Profile]
+
+  Avatar click → Profile dropdown:
+    → My Profile   (/profile)
+    → My Bookings  (/bookings)
+    → My Vouchers  (/vouchers → My Vouchers tab)
+    → Sign Out
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  PROFILE PAGE  /profile
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  View mode shows:
+    Avatar (click 📷 to upload new photo — JPG/PNG/WEBP max 3MB)
+    Name, @username, city 📍, phone 📞
+    Email, Bio, Postal code, Interests (tags)
+
+  [ Edit profile ] button (once per day, requires current password)
+    Edit form:
+      Name, Phone number, City (dropdown with search),
+      Postal code, Bio (600 chars), Interests (chip select),
+      Current password (required to save)
+
+  Upload avatar:
+    → Click camera icon on avatar
+    → Select image file
+    → Auto-uploaded to /api/uploads/avatar
+    → avatar_url saved to user record in DB
+    → Profile refreshes with new photo
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  TURF BROWSE  /turf
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  On load:
+    → Default: "All Cities" selected, "All sports" selected
+    → Auto-selects user's city from profile (once per session,
+      only if no city was previously chosen)
+
+  City Dropdown (top-left):
+    → Click to open panel (220px wide)
+    → Search box to filter cities as you type
+    → Options: All Cities + Kolkata, Mumbai, Delhi, Bengaluru,
+               Hyderabad, Chennai, Pune, Ahmedabad
+    → Selecting a city filters venues to that city
+    → Selecting "All Cities" clears filter (persists for session)
+    → City selections are tracked in user activity log
+
+  Sport Filter chips (scrollable row):
+    All sports | BGMI | Badminton | Basketball | Boxing/MMA |
+    Call of Duty | Carrom | Chess | Cricket | EA FC/FIFA |
+    Football | Free Fire | Kabaddi | PC Gaming | PUBG |
+    PlayStation | Swimming | Table Tennis | Tennis | Valorant | Volleyball
+
+    → Selecting a sport:
+        Filters venues to only those offering that sport
+        Shows sport-specific cover photo on venue cards
+        Renames venue card button to "View Badminton →" etc.
+        Tracked in user activity log
+
+  Venue Card:
+    → Sport-specific photo (Unsplash fallback if no cover)
+    → Sport badge (BADMINTON / CRICKET / etc.) when filtered
+    → Verified badge
+    → Venue name, city/state
+    → Matching listing name (e.g. "Badminton Court 1")
+    → Description
+    → 📞 Call button | 🗺 Maps button
+    → [ View Badminton → ] / [ View listings → ]
+        Navigates to /venue/:id?sport=badminton
+
+  Activity logged:
+    → Sport filter click → event: sport_filter
+    → City selection    → event: city_filter
+    → Venue card click  → event: venue_card_click
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  VENUE DETAIL PAGE  /venue/:id?sport=badminton
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  On load with ?sport=badminton:
+    → Badminton filter tab auto-selected
+    → Badminton listing auto-expanded
+    → Page scrolls to top
+    → Venue view tracked in activity log
+
+  Photo Gallery (Google Maps style, full width):
+    → Left: large main photo (sport-specific if no cover)
+    → Right: 2×2 thumbnail grid
+    → Click any photo → lightbox (← → arrow keys, Esc to close)
+    → Fills from: cover_url → listing photos → sport fallbacks
+
+  Venue Header:
+    → Name + Verified badge
+    → Address 📍 + Phone 📞
+    → [ Send Inquiry ] button → opens InquiryModal
+
+  Description
+
+  "What's available" section:
+    Filter chips: All | Badminton | Cricket | PlayStation
+    (Auto-selects sport from URL param)
+
+  Listing Cards (grid):
+    Each card shows:
+      → Sport-specific photo (always shows, never black)
+      → Sport category badge
+      → Title, description
+      → 👥 capacity | ⏱ duration
+      → Amenities tags
+      → Price | ▼ More / ▲ Less toggle
+
+    Click card → expands inline:
+      → "HOW TO BOOK" section
+      → [ 📩 Send Inquiry ] → opens InquiryModal
+      → [ 📞 Call ] → tel: link
+      → [ View → ] → navigates to /venue/:id?sport=<listing_sport>
+                      (scrolls to top, filter auto-sets)
+
+  Right Sidebar:
+    → Location card: embedded Google Maps + "Open in Google Maps ↗"
+    → Contact card: phone + [ Send Inquiry ] button
+    → Stats: 3 Listings | 3 Sports
+
+  Reviews Section (below listings):
+    → ★ avg rating · N reviews
+    → Review cards: avatar initial, name, date, stars, comment
+    → Write a review (if logged in):
+        Star picker (★ amber, 1–5)
+        Comment textarea
+        [ Submit Review ]
+        Duplicate review → 409 error shown
+
+  InquiryModal:
+    → Pre-filled: Name (from profile), Contact (phone or email)
+    → Message textarea
+    → [ Send ] → opens WhatsApp (if phone) or mailto (if email)
+
+  Activity logged:
+    → Page load    → event: venue_view
+    → Inquiry btn  → event: listing_inquiry (with listing details)
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  VOUCHERS  /vouchers
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  Two main tabs:
+
+  [ Browse Vouchers ] tab:
+    → City dropdown filter
+    → Partner deal cards (discount / free slot / food / merch)
+    → Click [ Buy ] → CheckoutModal
+        Pre-filled: email, name, phone (from profile)
+        Quantity selector (if stock > 1)
+        Terms shown
+        Price shown
+        [ Pay ₹XX ] → Razorpay (UPI/card/wallet)
+        [ Get voucher ] (if free)
+        On success → VoucherSuccessModal (shows code + QR)
+    → 🔍 Look up by code → /my-voucher
+
+  [ My Vouchers ] tab (logged in only, shows active count badge):
+    Status filters: All | Active | Redeemed | Expired
+    Each voucher card:
+      → Title, value label, partner name + city
+      → Status badge (✓ Active / Redeemed / Expired)
+      → Code (monospace) + [ Copy ] button
+      → QR code (if available)
+      → Expiry date
+      → [ View / Redeem → ] (active only) → /my-voucher?code=...
+
+  Activity logged:
+    → Voucher view     → event: voucher_view
+    → Voucher purchase → event: voucher_purchase
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  MY VOUCHER LOOKUP  /my-voucher
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  Enter code: CC-XXXX-XXXX (auto-formats as you type)
+  [ Find voucher ]
+    → Shows: title, value, partner, status
+    → Code + [ Copy ]
+    → QR code
+    → Expiry
+
+  Also accessible via /my-voucher?code=CC-XXXX-XXXX (pre-fills code)
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  MY BOOKINGS  /bookings
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  Filter tabs with count badges:
+    All | Upcoming | Ongoing | History
+
+  Each booking card:
+    → Date block (day + month)
+    → Listing name (#ID)
+    → Time range (e.g. 7:00 PM – 8:00 PM)
+    → Full date
+    → Player count (if set)
+    → Status badge:
+        Upcoming → teal badge
+        Live now → green badge + pulsing dot
+        Completed → grey badge
+    → Payment chip: ✓ Paid / ✓ Free / Pending
+
+  [ + Book a turf ] button → /turf
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  NEWS  /news
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  Category filter chips: All | Esports | Sports | General | Announcement
+  Article cards: cover photo, category badge, title, summary, date
+  Click → /news/:id (full article with body, view count++)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  LEADERBOARD  /leaderboard
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  Scope filter: Global | City | Venue
+  Period: All-time | This month | This week
+  Table: Rank · Avatar · Username · Points · W/L/D
+  "YOU" badge on current user's row
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  ESPORTS  /esports
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  Status tabs: Live | Upcoming | Completed | Exclusive
+  City filter
+  Tournament cards: game, format, prize, entry fee, registrations
+  Click → /esports/tournament/:id
+    → Details, rules, prizes
+    → [ Register ] (solo or team)
+    → Results bracket (after completion)
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  USER ACTIVITY LOG (automatic, fire-and-forget)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  Logged for authenticated users only.
+  Stored in: SQLite → user_activity table
+  Never blocks UI (async, silent failures ignored)
+
+  Events tracked:
+    venue_view       → User opens a venue detail page
+    venue_card_click → User clicks a venue card on /turf
+    listing_inquiry  → User clicks Send Inquiry on a listing
+    sport_filter     → User selects a sport chip on /turf
+    city_filter      → User selects a city from dropdown
+
+  Each event captures:
+    user_id, username, event, venue_id, venue_name,
+    sport, city, listing_id, listing_title, timestamp
+
+  Access:
+    Admin: /staff/admin → "📊 Activity" tab
+      → Insights view: top venues, top sports, top cities,
+        views-to-inquiry funnel (flags low-converting venues ⚠)
+      → Full log: filterable table with CSV export
+    Venue owner: /staff/admin → Activity tab (own venue only)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  STAFF PORTALS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  /staff-login  → Staff-only login (separate from user login)
+
+  /staff/admin  → Super Admin (is_admin=True)
+    Tabs:
+      Dashboard  → Stats: users, venues, tournaments, matches
+      Users      → Search, view, edit, ban, promote
+      Venues     → Verify, suspend, view listings/bookings
+      Tournaments→ Create, edit, results, assign match admins
+      News       → Create, edit, publish articles
+      Vouchers   → Create listings, view orders, revoke
+      📊 Activity→ User activity insights + full log + CSV export
+
+  /staff/venue  → Venue Owner (is_venue_owner=True)
+    → My venue info, listings, bookings, tournaments
+
+  /staff/match  → Match Admin (assigned to tournament)
+    → Record and verify matches for their tournament
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  EMAIL FLOWS (automatic)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  1. Signup OTP
+     Trigger: User starts signup
+     To: entered email
+     Contains: 6-digit OTP (expires 10 min)
+
+  2. Welcome email ★ NEW
+     Trigger: User completes signup (OTP verified)
+     To: new user's email
+     Subject: "Welcome to Champion Circuit, {name}! 🏆"
+     Contains: Feature overview (turf, esports, vouchers, leaderboard)
+               + Browse Venues → CTA button
+
+  3. Password reset OTP
+     Trigger: User requests forgot password
+     To: account email
+     Contains: 6-digit reset OTP
+
+  4. Voucher delivery
+     Trigger: Voucher purchased successfully
+     To: buyer's email
+     Contains: Code (monospace), value, partner, QR (if available)
+
+  5. Early access voucher (waitlist)
+     Trigger: Admin issues voucher to waitlist member
+     To: waitlist email
+     Contains: Code + benefit description
+
+  Dev mode (no SMTP configured):
+    All emails print to console as [DEV OTP] / [DEV WELCOME] etc.
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  END-TO-END FLOW — TURF BOOKING (current)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  1. User opens /turf
+       Default: All Cities, All Sports
+       (city auto-set from profile on first session visit)
+
+  2. Select sport: e.g. "Badminton"
+       → Only venues offering badminton shown
+       → Venue card shows badminton photo + "View Badminton →"
+
+  3. Click venue card
+       → Navigates to /venue/1?sport=badminton
+       → Scrolls to top
+
+  4. Venue detail page loads
+       → Badminton filter auto-selected
+       → Badminton Court 1 listing auto-expanded
+       → Gallery shows badminton court hero image
+
+  5. User reads listing details (expanded):
+       → Description, capacity, duration, amenities
+       → "HOW TO BOOK" instructions
+
+  6. User clicks [ 📩 Send Inquiry ]
+       → InquiryModal opens
+       → Pre-filled: Name, Contact (phone/email from profile)
+       → User types message
+       → [ Send ] → opens WhatsApp chat or mailto to venue
+
+  7. Optional: click [ View → ] on listing
+       → Navigates to /venue/1?sport=badminton
+       → Scrolls to top (same URL → smooth scroll reset)
+
+  8. Leave a review (after visiting):
+       → Click star rating (1–5)
+       → Optional comment
+       → [ Submit Review ]
+       → Review appears in grid below
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  END-TO-END FLOW — VOUCHER PURCHASE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  1. User opens /vouchers → Browse tab
+  2. Filter by city if needed
+  3. Click [ Buy ] on a voucher card
+  4. CheckoutModal:
+       → Email, Name, Phone pre-filled from profile
+       → Quantity selector
+       → Terms shown
+  5. [ Pay ₹99 ] → Razorpay (or [ Get voucher ] if free)
+  6. On success → code + QR shown in modal
+  7. Email delivered with code
+  8. User visits venue, shows QR → venue scans → redeemed ✓
+  9. View in /vouchers → My Vouchers tab → status: Redeemed
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  END-TO-END FLOW — ADMIN TRACKS USER ACTIVITY
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  1. User browses /turf, selects Badminton, clicks venue
+       → Events fired: sport_filter, venue_card_click, venue_view
+
+  2. User clicks Send Inquiry on Badminton Court 1
+       → Event fired: listing_inquiry
+
+  3. Admin opens /staff/admin → 📊 Activity tab
+       → Insights tab shows:
+           "Badminton - 3 clicks" in Top Sports bar chart
+           "Kolkata Central Arena - 2 views, 1 inquiry" in funnel
+           Conversion rate: 50%
+
+  4. Admin exports CSV for CRM/promotion targeting
+       → Can identify: "User X loves badminton in Kolkata"
+         → Send them badminton venue voucher
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  KEY URLS REFERENCE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  Public pages (no login required):
+    /                         Landing page
+    /turf                     Browse venues
+    /venue/:id                Venue detail (all sports)
+    /venue/:id?sport=cricket  Venue detail with sport pre-selected
+    /esports                  Esports tournaments
+    /leaderboard              Global leaderboard
+    /vouchers                 Browse voucher deals
+    /my-voucher               Look up voucher by code
+    /my-voucher?code=CC-XXXX  Pre-filled code lookup
+    /news                     News articles
+    /news/:id                 Article detail
+    /about                    About Champion Circuit
+    /login                    Login
+    /signup                   Sign up
+    /forgot-password          Forgot password
+
+  Authenticated pages:
+    /profile                  User profile + avatar upload
+    /bookings                 My bookings (Upcoming/Ongoing/History)
+
+  Staff portals (separate login at /staff-login):
+    /staff/admin              Super admin dashboard (all tabs)
+    /staff/venue              Venue owner portal
+    /staff/match              Match admin portal
+
+  Backend API base: http://127.0.0.1:8000
+  Docs: http://127.0.0.1:8000/docs
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  BACKEND DATA STORAGE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  Database: SQLite (local dev) → champion_circuit.db
+  ORM: SQLAlchemy + FastAPI
+
+  Key tables:
+    users              → accounts, avatar_url, phone, city, interests
+    venues             → name, address, lat/lng, cover, verified
+    listings           → sport category, price, capacity, photos
+    listing_amenities  → AC, Floodlit, WiFi etc.
+    listing_slots      → time slots per listing
+    bookings           → user → listing → date/time
+    reviews            → venue ratings (1–5 stars)
+    matches            → recorded match data
+    match_participants → per-player scores and points
+    tournaments        → esports/sport tournament data
+    tournament_registrations
+    score_adjustments  → admin manual point changes
+    news_articles      → published articles
+    voucher_listings   → purchasable vouchers
+    voucher_orders     → purchase records
+    issued_vouchers    → codes + QR + status
+    partners           → venue/brand partners
+    notifications      → in-app notifications per user
+    user_activity      → analytics log (NEW)
+    email_otps         → signup/reset OTPs
+
+  Uploaded files:
+    backend/uploads/           → avatar images
+    backend/uploads/listings/  → listing photos
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  FRONTEND TECH STACK
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  React 18 + TypeScript + Vite
+  React Router v6 (client-side routing)
+  CSS (single index.css, no Tailwind)
+  Fonts: Newsreader (headings) + DM Sans (body)
+  Colors: Navy deep #060d1a, Accent teal #0abfbc
+  Dev server: http://127.0.0.1:5173
+
+  Key contexts:
+    AuthContext  → user session, token, refreshUser
+    CityContext  → selected cities (localStorage + sessionStorage)
+
+  Key hooks:
+    useActivity  → fire-and-forget analytics tracking
+
+  Key pages:
+    TurfBrowsePage      → /turf
+    VenueDetailPage     → /venue/:id
+    VouchersPage        → /vouchers (Browse + My Vouchers tabs)
+    BookingsPage        → /bookings (Upcoming/Ongoing/History tabs)
+    ProfilePage         → /profile (with phone field + avatar upload)
+    ActivityLogPage     → /admin/activity (admin only)
+    SuperAdminPage      → /staff/admin (includes Activity tab)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  END OF FLOW DOCUMENT
+  Champion Circuit v2.0 — June 2026
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━

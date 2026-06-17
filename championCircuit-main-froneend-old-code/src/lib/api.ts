@@ -129,6 +129,7 @@ export const api = {
   // Update profile
   updateProfile: (payload: {
     name: string;
+    phone: string;
     city: string;
     postal_code: string;
     interests: string[];

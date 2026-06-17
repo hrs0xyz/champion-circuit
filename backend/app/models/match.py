@@ -336,8 +336,11 @@ class Review(Base):
     __tablename__ = "reviews"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    venue_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("venues.id", ondelete="SET NULL"), nullable=True, index=True
+    )
     listing_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("listings.id", ondelete="CASCADE"), nullable=False, index=True
+        Integer, ForeignKey("listings.id", ondelete="CASCADE"), nullable=True, index=True
     )
     user_id: Mapped[int] = mapped_column(
         Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
