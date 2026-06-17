@@ -1,18 +1,20 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
-import { BrowserRouter } from 'react-router-dom';
-
-import { AuthProvider } from './context/AuthContext';
-import { App } from './App';
-import './styles/index.css';
+import App from './App';
+import { ErrorBoundary } from './components/ErrorBoundary';
+import './index.css';
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
-    <BrowserRouter>
-      <AuthProvider>
-        <App />
-      </AuthProvider>
-    </BrowserRouter>
+    <ErrorBoundary
+      fallback={
+        <div style={{ color: '#e8edf7', padding: 40, textAlign: 'center', fontFamily: 'system-ui' }}>
+          <h2>Something went wrong</h2>
+          <p>Please refresh the page.</p>
+        </div>
+      }
+    >
+      <App />
+    </ErrorBoundary>
   </React.StrictMode>,
 );
-

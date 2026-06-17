@@ -57,7 +57,7 @@ API docs at: **http://127.0.0.1:8000/docs**
 ### 3. Frontend setup
 
 ```bash
-cd championCircuit-main-froneend-old-code
+cd froneend
 
 # Install dependencies
 npm install

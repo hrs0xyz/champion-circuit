@@ -1,166 +1,204 @@
-import { CheckCircle2, Sparkles } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
+import { useState, useEffect, useRef, type FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-
-import { api } from '../api/client';
-import { GoogleButton } from '../components/GoogleButton';
 import { useAuth } from '../context/AuthContext';
+import { api, ApiError } from '../lib/api';
+import { OtpInput } from '../components/ui/OtpInput';
 
-type Step = 'account' | 'otp';
+type Step = 'form' | 'otp';
+
+const USERNAME_RE = /^[a-z0-9_]{4,16}$/;
+
+function UsernameStatus({ username }: { username: string }) {
+  const [status, setStatus] = useState<'idle' | 'checking' | 'available' | 'taken' | 'invalid'>('idle');
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    if (timerRef.current) clearTimeout(timerRef.current);
+    if (!username) { setStatus('idle'); return; }
+    if (!USERNAME_RE.test(username.toLowerCase())) { setStatus('invalid'); return; }
+    setStatus('checking');
+    timerRef.current = setTimeout(() => {
+      api.checkUsername(username)
+        .then((res) => setStatus(res.available ? 'available' : 'taken'))
+        .catch(() => setStatus('idle'));
+    }, 500);
+    return () => { if (timerRef.current) clearTimeout(timerRef.current); };
+  }, [username]);
+
+  if (status === 'idle') return null;
+  if (status === 'checking') return <span className="username-hint username-hint--checking">Checking…</span>;
+  if (status === 'available') return <span className="username-hint username-hint--ok">✓ Available</span>;
+  if (status === 'taken') return <span className="username-hint username-hint--err">✗ Already taken</span>;
+  return <span className="username-hint username-hint--err">4–16 chars, letters / numbers / _ only</span>;
+}
 
 export function SignupPage() {
-  const { signupStart, signupVerify, googleLogin } = useAuth();
+  const { setToken } = useAuth();
   const navigate = useNavigate();
-  const [step, setStep] = useState<Step>('account');
+
+  const [step, setStep] = useState<Step>('form');
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [otp, setOtp] = useState('');
-  const [devOtp, setDevOtp] = useState('');
-  const [usernameState, setUsernameState] = useState<'idle' | 'checking' | 'available' | 'taken'>('idle');
   const [error, setError] = useState('');
-  const [submitting, setSubmitting] = useState(false);
+  const [loading, setLoading] = useState(false);
 
-  const cleanUsername = useMemo(() => username.trim().toLowerCase(), [username]);
-
-  useEffect(() => {
-    if (cleanUsername.length < 3) {
-      setUsernameState('idle');
-      return;
-    }
-    const timer = window.setTimeout(() => {
-      setUsernameState('checking');
-      api
-        .username(cleanUsername)
-        .then((result) => setUsernameState(result.available ? 'available' : 'taken'))
-        .catch(() => setUsernameState('idle'));
-    }, 350);
-    return () => window.clearTimeout(timer);
-  }, [cleanUsername]);
-
-  async function startSignup(event: React.FormEvent) {
-    event.preventDefault();
+  async function handleSignupStart(e: FormEvent) {
+    e.preventDefault();
     setError('');
-    if (usernameState === 'taken') {
-      setError('That username is already taken.');
+    if (!USERNAME_RE.test(username.toLowerCase())) {
+      setError('Username must be 4–16 characters: letters, numbers, and _ only.');
       return;
     }
-    setSubmitting(true);
+    setLoading(true);
     try {
-      const response = await signupStart({ username: cleanUsername, email, password });
-      setDevOtp(response.dev_otp ?? '');
+      await api.signupStart(username.trim().toLowerCase(), email.trim().toLowerCase(), password);
       setStep('otp');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not start signup.');
+      setError(err instanceof ApiError ? err.message : 'Something went wrong. Try again.');
     } finally {
-      setSubmitting(false);
+      setLoading(false);
     }
   }
 
-  async function verifyOtp(event: React.FormEvent) {
-    event.preventDefault();
+  async function handleOtpVerify(e: FormEvent) {
+    e.preventDefault();
     setError('');
-    setSubmitting(true);
+    setLoading(true);
     try {
-      await signupVerify({ email, otp });
-      navigate('/');
+      const res = await api.signupVerify(email.trim().toLowerCase(), otp.trim());
+      await setToken(res.access_token);
+      navigate('/', { replace: true });
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not verify OTP.');
+      setError(err instanceof ApiError ? err.message : 'Invalid or expired OTP. Try again.');
     } finally {
-      setSubmitting(false);
+      setLoading(false);
     }
+  }
+
+  async function handleResend() {
+    setError('');
+    setLoading(true);
+    try {
+      await api.signupStart(username.trim().toLowerCase(), email.trim().toLowerCase(), password);
+      setOtp('');
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Could not resend OTP.');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  if (step === 'otp') {
+    return (
+      <section className="section section-auth">
+        <div className="auth-card">
+          <div className="auth-card__logo">
+            <img src="/branding/cc-mark.png" alt="Champion Circuit" width={48} height={48} />
+          </div>
+          <h1 className="auth-card__title">Check your inbox</h1>
+          <p className="auth-card__sub">
+            We sent a 6-digit code to <strong>{email}</strong>.
+          </p>
+
+          <form className="auth-form" onSubmit={(e) => void handleOtpVerify(e)}>
+            <div className="auth-field">
+              <label className="auth-label">6-digit code</label>
+              <OtpInput value={otp} onChange={setOtp} autoFocus />
+            </div>
+            {error ? <p className="auth-error">{error}</p> : null}
+            <button type="submit" className="btn btn-primary auth-submit" disabled={loading || otp.length !== 6}>
+              {loading ? 'Verifying…' : 'Verify & create account'}
+            </button>
+          </form>
+
+          <p className="auth-footer">
+            Didn't get it?{' '}
+            <button type="button" className="auth-footer-link" onClick={() => void handleResend()} disabled={loading}>
+              Resend code
+            </button>
+            {' · '}
+            <button type="button" className="auth-footer-link" onClick={() => setStep('form')}>
+              Go back
+            </button>
+          </p>
+        </div>
+      </section>
+    );
   }
 
   return (
-    <main className="auth-page">
-      <section className="auth-panel">
-        <p className="eyebrow">Claim your handle</p>
-        <h1>Signup</h1>
-        <p className="muted">Start with the basics. Your sports, city, avatar, and bio can come later.</p>
+    <section className="section section-auth">
+      <div className="auth-card">
+        <div className="auth-card__logo">
+          <img src="/branding/cc-mark.png" alt="Champion Circuit" width={48} height={48} />
+        </div>
+        <h1 className="auth-card__title">Claim your handle</h1>
+        <p className="auth-card__sub">Start with the basics. Your sports, city, and bio can come later.</p>
 
-        {step === 'account' ? (
-          <form className="profile-form" onSubmit={startSignup}>
-            <label>
-              Username
+        <form className="auth-form" onSubmit={(e) => void handleSignupStart(e)}>
+          <div className="auth-field">
+            <label htmlFor="username" className="auth-label">Username</label>
+            <div className="auth-input-wrap">
               <input
-                value={username}
-                onChange={(event) => setUsername(event.target.value)}
-                placeholder="champion_07"
+                id="username"
+                className="auth-input"
+                type="text"
                 autoComplete="username"
+                placeholder="your_handle"
+                value={username}
+                onChange={(e) => setUsername(e.target.value.replace(/[^a-zA-Z0-9_]/g, '').slice(0, 16))}
+                required
                 minLength={4}
                 maxLength={16}
-                pattern="[A-Za-z0-9_]+"
-                required
               />
-            </label>
-            <p className={`username-hint ${usernameState}`}>
-              {usernameState === 'checking'
-                ? 'Checking username...'
-                : usernameState === 'available'
-                  ? `${cleanUsername} is available. Nice.`
-                  : usernameState === 'taken'
-                    ? `${cleanUsername} is taken. Try a sharper one.`
-                    : '4-16 characters. Letters, numbers, underscore only.'}
-            </p>
-            <label>
-              Email
-              <input type="email" value={email} onChange={(event) => setEmail(event.target.value)} autoComplete="email" required />
-            </label>
-            <label>
-              Password
-              <input
-                type="password"
-                value={password}
-                onChange={(event) => setPassword(event.target.value)}
-                autoComplete="new-password"
-                minLength={8}
-                required
-              />
-            </label>
-            {error ? <p className="form-error">{error}</p> : null}
-            <div className="form-actions">
-              <button className="primary-action" type="submit" disabled={submitting || usernameState === 'taken'}>
-                <Sparkles size={18} />
-                {submitting ? 'Sending OTP...' : 'Get OTP'}
-              </button>
-              <GoogleButton
-                onToken={async (token) => {
-                  await googleLogin(token);
-                  navigate('/profile');
-                }}
-              />
+              <UsernameStatus username={username} />
             </div>
-          </form>
-        ) : (
-          <form className="profile-form" onSubmit={verifyOtp}>
-            <div className="otp-card">
-              <CheckCircle2 />
-              <div>
-                <strong>OTP sent</strong>
-                <p className="muted">Enter the 6 digit code sent to {email}.</p>
-              </div>
-            </div>
-            {devOtp ? <p className="dev-otp">Local dev OTP: {devOtp}</p> : null}
-            <label>
-              OTP
-              <input value={otp} onChange={(event) => setOtp(event.target.value)} inputMode="numeric" maxLength={6} required />
-            </label>
-            {error ? <p className="form-error">{error}</p> : null}
-            <div className="form-actions">
-              <button className="primary-action" type="submit" disabled={submitting}>
-                {submitting ? 'Verifying...' : 'Create profile'}
-              </button>
-              <button className="secondary-action" type="button" onClick={() => setStep('account')}>
-                Edit details
-              </button>
-            </div>
-          </form>
-        )}
+            <span className="auth-hint">4–16 characters. Letters, numbers, and _ only.</span>
+          </div>
 
-        <p className="auth-link">
-          Already signed up? <Link to="/login">Login</Link>
+          <div className="auth-field">
+            <label htmlFor="email" className="auth-label">Email</label>
+            <input
+              id="email"
+              className="auth-input"
+              type="email"
+              autoComplete="email"
+              placeholder="you@example.com"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+            />
+          </div>
+
+          <div className="auth-field">
+            <label htmlFor="password" className="auth-label">Password</label>
+            <input
+              id="password"
+              className="auth-input"
+              type="password"
+              autoComplete="new-password"
+              placeholder="At least 8 characters"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+              minLength={8}
+            />
+          </div>
+
+          {error ? <p className="auth-error">{error}</p> : null}
+
+          <button type="submit" className="btn btn-primary auth-submit" disabled={loading}>
+            {loading ? 'Sending OTP…' : 'Continue'}
+          </button>
+        </form>
+
+        <p className="auth-footer">
+          Already signed up?{' '}
+          <Link to="/login" className="auth-footer-link">Log in</Link>
         </p>
-      </section>
-    </main>
+      </div>
+    </section>
   );
 }
