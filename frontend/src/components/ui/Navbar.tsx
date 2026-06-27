@@ -4,14 +4,21 @@ import { useAuth } from '../../context/AuthContext';
 
 const MOBILE_MENU_ID = 'site-mobile-navigation';
 
-const publicLinks = [
+type NavItem = {
+  to: string;
+  label: string;
+  /** When true the link is only rendered for authenticated users. */
+  requiresAuth?: boolean;
+};
+
+const NAV_LINKS: readonly NavItem[] = [
   { to: '/turf', label: 'Turf' },
   { to: '/esports', label: 'Esports' },
-  { to: '/vouchers', label: 'Vouchers' },
-  { to: '/leaderboard', label: 'Leaderboard' },
+  { to: '/vouchers', label: 'Shop' },
+  { to: '/leaderboard', label: 'Leaderboard', requiresAuth: true },
   { to: '/news', label: 'News' },
   { to: '/about', label: 'About' },
-] as const;
+];
 
 const BASE_URL = import.meta.env.VITE_API_URL ?? 'http://127.0.0.1:8000';
 
@@ -59,6 +66,9 @@ export function Navbar({ variant }: NavbarProps) {
   const initial = (displayName[0] ?? 'C').toUpperCase();
   const avatarUrl = avatarSrc(user?.avatar_url || user?.photo_url);
 
+  // Auth-gated links (e.g. Leaderboard) are only shown once a user is signed in.
+  const navLinks = NAV_LINKS.filter((l) => !l.requiresAuth || Boolean(user));
+
   const navClass = ({ isActive }: { isActive: boolean }) => (isActive ? 'nav-link is-active' : 'nav-link');
 
   function handleSignOut() {
@@ -76,7 +86,7 @@ export function Navbar({ variant }: NavbarProps) {
             <span className="brand-sr">Champion Circuit, home</span>
           </Link>
           <nav className="nav-glass" aria-label="Site">
-            {publicLinks.map((l) => (
+            {navLinks.map((l) => (
               <NavLink key={l.to} to={l.to} className={navClass} onClick={close}>
                 {l.label}
               </NavLink>
@@ -158,7 +168,7 @@ export function Navbar({ variant }: NavbarProps) {
         aria-hidden={!open}
       >
         <nav className="mobile-nav-links" aria-label="Mobile site menu">
-          {publicLinks.map((l) => (
+          {navLinks.map((l) => (
             <NavLink key={l.to} to={l.to} className={navClass} onClick={close}>
               {l.label}
             </NavLink>

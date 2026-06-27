@@ -12,7 +12,7 @@ interface Props {
 
 export function OtpInput({ value, onChange, autoFocus }: Props) {
   const refs = useRef<(HTMLInputElement | null)[]>([]);
-  const digits = value.padEnd(6, '').split('').slice(0, 6);
+  const digits = value.padEnd(6, ' ').split('').slice(0, 6);
 
   function focus(i: number) {
     refs.current[i]?.focus();

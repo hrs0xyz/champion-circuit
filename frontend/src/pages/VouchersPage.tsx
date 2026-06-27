@@ -105,7 +105,7 @@ export function VouchersPage() {
             className={`vouchers-main-tab${mainTab === 'browse' ? ' vouchers-main-tab--active' : ''}`}
             onClick={() => setMainTab('browse')}
           >
-            Browse Vouchers
+            Shop
           </button>
           {user && (
             <button

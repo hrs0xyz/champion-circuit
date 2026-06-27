@@ -1,28 +1,62 @@
+import { motion } from 'framer-motion';
+
+const PILLARS = [
+  {
+    num: '.01',
+    title: 'Turf Sports',
+    body: 'Book maintained pitches, join local leagues, and let venues run tournaments end-to-end.',
+  },
+  {
+    num: '.02',
+    title: 'Esports Arena',
+    body: 'Online and offline brackets across BGMI, Valorant, Free Fire and more — with a real venue.',
+  },
+  {
+    num: '.03',
+    title: 'Health & Wellness',
+    body: 'Recovery, pool, and leisure between match days. Built around how players actually live.',
+  },
+  {
+    num: '.04',
+    title: 'AI & Performance',
+    body: 'Wearables and player profiles that turn every session into data, insight, and progress.',
+  },
+] as const;
+
+const ease = [0.22, 1, 0.36, 1] as const;
+
 export function LandingInfoSection() {
   return (
-    <section id="landing-features" className="section section-landing-info">
-      <div className="section-inner">
-        <div className="section-head section-head--center landing-info-head">
-          <h2>One hub. One community.</h2>
-          <p>Turf, esports, wellness, and performance tracking in one membership.</p>
-        </div>
-        <div className="cards landing-info-grid">
-          <article className="card">
-            <h3>Turf sports</h3>
-            <p>Book pitches and play in maintained facilities with local leagues.</p>
-          </article>
-          <article className="card">
-            <h3>Esports arena</h3>
-            <p>Online and offline tournaments with a real venue for your community.</p>
-          </article>
-          <article className="card">
-            <h3>Health &amp; wellness</h3>
-            <p>Recovery, pool, and leisure between match days.</p>
-          </article>
-          <article className="card">
-            <h3>AI &amp; performance</h3>
-            <p>Profiles and insights that grow with every season.</p>
-          </article>
+    <section id="landing-features" className="lp-section lp-pillars">
+      <div className="lp-section__inner">
+        <header className="lp-section__head">
+          <span className="lp-kicker">// The Ecosystem</span>
+          <h2 className="lp-section__title">
+            One hub. <span className="lp-grad">One community.</span>
+          </h2>
+          <p className="lp-section__lead">
+            Turf, esports, wellness, and performance tracking — unified into a single membership.
+          </p>
+        </header>
+
+        <div className="lp-pillars__grid">
+          {PILLARS.map((p, i) => (
+            <motion.article
+              key={p.num}
+              className="lp-pillar"
+              initial={{ opacity: 0, y: 28 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true, margin: '-60px' }}
+              transition={{ duration: 0.5, ease, delay: i * 0.06 }}
+            >
+              <span className="lp-pillar__num" aria-hidden="true">
+                {p.num}
+              </span>
+              <h3 className="lp-pillar__title">{p.title}</h3>
+              <p className="lp-pillar__body">{p.body}</p>
+              <span className="lp-pillar__edge" aria-hidden="true" />
+            </motion.article>
+          ))}
         </div>
       </div>
     </section>

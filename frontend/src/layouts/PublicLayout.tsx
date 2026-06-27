@@ -1,6 +1,7 @@
 import { Outlet, useLocation } from 'react-router-dom';
 import { Navbar } from '../components/ui/Navbar';
 import { Footer } from '../components/ui/Footer';
+import { InteractiveBackground } from '../components/ui/InteractiveBackground';
 import { useAuth } from '../context/AuthContext';
 
 export function PublicLayout() {
@@ -16,6 +17,7 @@ export function PublicLayout() {
         <div className="aurora aurora--blue" />
         <div className="aurora aurora--silver" />
       </div>
+      <InteractiveBackground />
       <div className="noise" aria-hidden="true" />
       <Navbar variant={navVariant} />
       <main className={isLanding ? 'main-landing' : 'main-public'}>

@@ -70,7 +70,14 @@ export default function App() {
                 <Route path="esports" element={<EsportsBrowsePage />} />
                 <Route path="esports/tournament/:id" element={<EsportsTournamentPage />} />
 
-                <Route path="leaderboard" element={<LeaderboardPage />} />
+                <Route
+                  path="leaderboard"
+                  element={
+                    <RequireAuth>
+                      <LeaderboardPage />
+                    </RequireAuth>
+                  }
+                />
 
                 <Route path="vouchers" element={<VouchersPage />} />
                 <Route path="my-voucher" element={<MyVoucherPage />} />

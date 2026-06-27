@@ -1,99 +1,70 @@
-import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 
-const heroContainer = {
+const container = {
   initial: {},
-  animate: {
-    transition: { staggerChildren: 0.08, delayChildren: 0.05 },
-  },
+  animate: { transition: { staggerChildren: 0.09, delayChildren: 0.05 } },
 };
 
 const fadeUp = {
-  initial: { opacity: 0, y: 28 },
+  initial: { opacity: 0, y: 30 },
   animate: { opacity: 1, y: 0 },
 };
 
+const ease = [0.22, 1, 0.36, 1] as const;
+
+const TICKER = ['Turf Booking', 'Esports Arena', 'Performance Analysis'] as const;
+
 export function Hero({ scrollIntensity }: { scrollIntensity: number }) {
-  const videos = ['/videos/football.mp4', '/videos/gaming1.mp4', '/videos/gaming2.mp4', '/videos/stadium.mp4'];
-  const [activeVideo, setActiveVideo] = useState(0);
-
-  useEffect(() => {
-    const id = window.setInterval(() => {
-      setActiveVideo((i) => (i + 1) % videos.length);
-    }, 5500);
-    return () => window.clearInterval(id);
-  }, [videos.length]);
-
-  const switchVideo = (idx: number) => setActiveVideo(idx);
-
   return (
-    <section className="hero" id="top">
-      <div className="hero-bg-media" aria-hidden="true">
-        {videos.map((src, idx) => (
-          <video
-            key={src}
-            className={`hero-bg-video${idx === activeVideo ? ' is-active' : ''}`}
-            src={src}
-            autoPlay
-            muted
-            loop
-            playsInline
-            preload="metadata"
-          />
-        ))}
-        <div className="hero-bg-scrim" />
-      </div>
-      <div
-        className="hero-glow"
-        aria-hidden="true"
-        style={{ opacity: 1 - scrollIntensity * 0.85 }}
-      />
-      <div className="hero-inner">
-        <motion.div
-          className="hero-copy"
-          variants={heroContainer}
-          initial="initial"
-          animate="animate"
-          style={{ width: '100%', maxWidth: '100%', boxSizing: 'border-box' }}
-        >
-          <motion.div className="hero-kicker" variants={fadeUp} transition={{ duration: 0.55, ease: [0.22, 1, 0.36, 1] }}>
-            <span className="hero-kicker-line" />
-            <p className="eyebrow">Sports + Esports + Creators</p>
-            <span className="hero-kicker-line" />
-          </motion.div>
-          <motion.h1 variants={fadeUp} transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}>
-            Where Gaming Meets Sports
-          </motion.h1>
-          <motion.p className="hero-sub" variants={fadeUp} transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}>
-            India&apos;s first integrated youth sports &amp; gaming ecosystem. Book a pitch, join a bracket, one
-            membership, one community.
-          </motion.p>
-          <motion.div
-            className="hero-actions"
-            variants={fadeUp}
-            transition={{ duration: 0.55, ease: [0.22, 1, 0.36, 1] }}
-          >
-            <Link className="btn btn-primary" to="/turf">
-              Book a turf
-            </Link>
-            <Link className="btn btn-secondary" to="/esports">
-              Join a tournament
-            </Link>
-          </motion.div>
+    <section className="lp-hero" id="top">
+      {/* drifting energy orb behind the headline; fades as you scroll */}
+      <div className="lp-hero__orb" aria-hidden="true" style={{ opacity: 1 - scrollIntensity * 0.9 }} />
+
+      {/* HUD corner brackets */}
+      <span className="lp-hud lp-hud--tl" aria-hidden="true" />
+      <span className="lp-hud lp-hud--tr" aria-hidden="true" />
+      <span className="lp-hud lp-hud--bl" aria-hidden="true" />
+      <span className="lp-hud lp-hud--br" aria-hidden="true" />
+
+      <motion.div className="lp-hero__inner" variants={container} initial="initial" animate="animate">
+        <motion.p className="lp-eyebrow" variants={fadeUp} transition={{ duration: 0.5, ease }}>
+          <span className="lp-eyebrow__dot" aria-hidden="true" />
+          Sports&nbsp;&times;&nbsp;Esports&nbsp;&times;&nbsp;Performance&nbsp;Analysis
+        </motion.p>
+
+        <motion.h1 className="lp-hero__title" variants={fadeUp} transition={{ duration: 0.65, ease }}>
+          Where Gaming
+          <br />
+          Meets <span className="lp-grad">Sports</span>
+        </motion.h1>
+
+        <motion.p className="lp-hero__sub" variants={fadeUp} transition={{ duration: 0.6, ease }}>
+          India&apos;s first integrated youth sports &amp; gaming ecosystem. Book a pitch, join a bracket, track your
+          game &mdash; one membership, one community.
+        </motion.p>
+
+        <motion.div className="lp-hero__cta" variants={fadeUp} transition={{ duration: 0.55, ease }}>
+          <Link className="lp-btn lp-btn--primary" to="/turf">
+            Book a turf
+            <span className="lp-btn__arrow" aria-hidden="true">
+              &rarr;
+            </span>
+          </Link>
+          <Link className="lp-btn lp-btn--ghost" to="/esports">
+            Join a tournament
+          </Link>
         </motion.div>
-      </div>
-      <div className="hero-video-dots" aria-label="Hero media controls">
-        {videos.map((v, idx) => (
-          <button
-            key={v}
-            type="button"
-            className={`vdot${idx === activeVideo ? ' active' : ''}`}
-            onClick={() => switchVideo(idx)}
-            aria-label={`Show hero video ${idx + 1}`}
-          />
-        ))}
-      </div>
+
+        <motion.ul className="lp-hero__ticker" variants={fadeUp} transition={{ duration: 0.55, ease }} aria-label="What's inside">
+          {TICKER.map((item) => (
+            <li key={item} className="lp-chip">
+              <span className="lp-chip__dot" aria-hidden="true" />
+              {item}
+            </li>
+          ))}
+        </motion.ul>
+      </motion.div>
     </section>
   );
 }
