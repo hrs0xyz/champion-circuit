@@ -7939,3 +7939,101 @@ a.contact-item:hover {
   .lp-hero__orb { transform: translate(-50%, -50%); }
   .lp-hero::after { display: none; }
 }
+
+/* ─────────────────────── FOUNDERS & ADVISORS ─────────────────────── */
+
+.section-founders,
+.section-advisors {
+  background: transparent;
+  padding-top: clamp(36px, 5.5vw, 60px);
+  padding-bottom: clamp(36px, 5.5vw, 60px);
+}
+
+.section-head--center {
+  text-align: center;
+}
+
+.section-head--center p {
+  margin-left: auto;
+  margin-right: auto;
+}
+
+/* Founders: flex row, all 5 cards in one line, centered */
+.founders-grid {
+  display: flex !important;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: clamp(14px, 2vw, 20px);
+}
+
+.founder-card {
+  flex: 0 1 200px;
+  min-width: 160px;
+  max-width: 220px;
+  align-items: center !important;
+  text-align: center;
+  gap: 10px !important;
+  padding: clamp(18px, 2.5vw, 24px) clamp(14px, 2vw, 18px) !important;
+}
+
+.founder-photo {
+  width: 96px;
+  height: 96px;
+  border-radius: 50%;
+  object-fit: cover;
+  object-position: top center;
+  border: 2px solid rgba(10, 191, 188, 0.35);
+  flex-shrink: 0;
+}
+
+.founder-card h3 {
+  font-size: 15px !important;
+  font-weight: 700;
+  margin: 4px 0 0 !important;
+  color: var(--silver);
+}
+
+.founder-role {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--accent);
+  margin: 0 !important;
+  letter-spacing: 0.01em;
+}
+
+.founder-note {
+  line-height: 1.55 !important;
+  font-size: 12px !important;
+  color: var(--text-muted) !important;
+  margin: 0 !important;
+}
+
+/* Advisor section: single card centered, slightly wider */
+.founders-grid--centered .founder-card {
+  flex: 0 1 240px;
+  max-width: 260px;
+}
+
+/* Responsive: 3-col on tablet */
+@media (max-width: 900px) {
+  .founder-card {
+    flex: 0 1 calc(33.33% - 14px);
+    max-width: none;
+  }
+}
+
+/* 2-col on small tablet */
+@media (max-width: 600px) {
+  .founder-card {
+    flex: 0 1 calc(50% - 14px);
+    max-width: none;
+  }
+}
+
+/* 1-col on mobile */
+@media (max-width: 380px) {
+  .founder-card {
+    flex: 0 1 100%;
+    max-width: none;
+  }
+}
