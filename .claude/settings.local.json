@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx tsc *)",
+      "WebFetch(domain:nodwingaming.com)",
+      "WebFetch(domain:21tsi.com)",
+      "Bash(npx vite *)",
+      "Bash(cp /c/Users/nikhil.jain_int/Downloads/championcircuit/frontend/public/branding/cc-full.png \"/c/Users/nikhil.jain_int/Downloads/champion-circuit-logo.png\")",
+      "Read(//c/Users/nikhil.jain_int/Downloads/**)"
+    ]
+  }
+}

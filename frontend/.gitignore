@@ -143,3 +143,4 @@ vite.config.js
 vite.config.d.ts
 *.local
 
+.vercel

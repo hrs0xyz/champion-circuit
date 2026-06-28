@@ -25,9 +25,13 @@ __pycache__/
 # *.db
 # *.sqlite
 # *.sqlite3
+champion_circuit.db
+backend/champion_circuit.db
 
 # ── Secrets — NEVER commit these ──────────────────────────────────────────────
 .env
+.env2
+env
 .env.local
 .env.*.local
 *.pem
@@ -47,6 +51,11 @@ prep.js
 prep_v2.js
 frontend-profile-check.png
 COMPLETE CODE.zip
+user_flow_diagram.txt
+CC-DB.txt
+CHAMPION_CIRCUIT_GUIDE.md
+CURRENT_USER_FLOW.txt
+user-FLOW.TXT
 
 # ── KiroGraph index (local only) ─────────────────────────────────────────────
 .kirograph/
