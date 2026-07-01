@@ -1,0 +1,3 @@
+{"timestamp":1782581797090,"command":"vercel --version","originalTokens":2,"compressedTokens":2,"strategy":"generic:short","sessionId":"e17b98339b6509c6","source":"exec"}
+{"timestamp":1782581808080,"command":"vercel whoami","originalTokens":6,"compressedTokens":6,"strategy":"generic:short","sessionId":"e17b98339b6509c6","source":"exec"}
+{"timestamp":1782581844044,"command":"vercel --prod --yes","originalTokens":505,"compressedTokens":493,"strategy":"generic:deduped:error-preserved","sessionId":"e17b98339b6509c6","source":"exec"}
