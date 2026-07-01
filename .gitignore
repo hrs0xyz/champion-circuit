@@ -1,0 +1,80 @@
+# ── Duplicate / old folder ────────────────────────────────────────────────────
+championcircuit/
+
+
+.venv/
+.env
+__pycache__/
+*.pyc
+champion_circuit.db
+uploads/
+
+node_modules/
+dist/
+.env
+.env.*
+.vscode/
+.idea/
+__pycache__/
+*.pyc
+uploads/
+
+
+# ── OS ────────────────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+
+# ── Node ──────────────────────────────────────────────────────────────────────
+node_modules/
+dist/
+.cache/
+*.tsbuildinfo
+
+# ── Python ────────────────────────────────────────────────────────────────────
+.venv/
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.egg-info/
+.eggs/
+
+# ── Database — exclude production DBs but allow dev seed DB ──────────────────
+# Uncomment below to exclude ALL db files:
+# *.db
+# *.sqlite
+# *.sqlite3
+champion_circuit.db
+backend/champion_circuit.db
+
+# ── Secrets — NEVER commit these ──────────────────────────────────────────────
+.env
+.env2
+env
+.env.local
+.env.*.local
+*.pem
+*.key
+client_secret*.json
+
+# ── Uploads — include user avatars and listing photos ─────────────────────────
+# (uncomment below to exclude uploads if needed in production)
+# backend/uploads/*
+# !backend/uploads/.gitkeep
+
+# ── Build & misc ──────────────────────────────────────────────────────────────
+build/
+*.zip
+*.docx
+prep.js
+prep_v2.js
+frontend-profile-check.png
+COMPLETE CODE.zip
+user_flow_diagram.txt
+CC-DB.txt
+CHAMPION_CIRCUIT_GUIDE.md
+CURRENT_USER_FLOW.txt
+user-FLOW.TXT
+
+# ── KiroGraph index (local only) ─────────────────────────────────────────────
+.kirograph/
