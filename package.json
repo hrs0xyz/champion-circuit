@@ -1,0 +1,6 @@
+{
+  "dependencies": {
+    "docx": "^9.7.1",
+    "verbos": "^0.0.3"
+  }
+}
