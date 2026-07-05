@@ -1,6 +1,6 @@
 from email.message import EmailMessage
 import smtplib
-
+import traceback
 from app.core.config import settings
 
 
@@ -361,6 +361,16 @@ def send_welcome_email(to_email: str, username: str, name: str = "") -> bool:
             smtp.login(settings.SMTP_USERNAME, settings.SMTP_PASSWORD)
             smtp.send_message(message)
         return True
+    # except Exception as exc:
+    #     print(f"[EMAIL ERROR] Welcome email to {to_email}: {exc}")
+    #     return False
+    
+
     except Exception as exc:
-        print(f"[EMAIL ERROR] Welcome email to {to_email}: {exc}")
-        return False
+        print("=" * 80)
+        print(type(exc))
+        print(repr(exc))
+        traceback.print_exc()
+        print("=" * 80)
+
+        print(f"[EMAIL ERROR] Failed to send {purpose} OTP to {to_email}: {exc}")
