@@ -2,14 +2,15 @@
 Venue, listing, booking service layer.
 """
 import re
-from sqlalchemy.orm import Session, joinedload
+from sqlalchemy.orm import Session, joinedload, selectinload
 
+from app.models.user import User
 from app.models.venue import (
     Booking, Listing, ListingAmenity, ListingCategory,
     ListingPhoto, ListingSlot, Venue, VenueAdmin,
 )
 from app.schemas.venue import (
-    BookingCreate, ListingCreate, SlotCreate, VenueCreate, VenueUpdate,
+    BookingCreate, ListingCreate, ListingUpdate, SlotCreate, VenueCreate, VenueUpdate,
 )
 
 
@@ -56,6 +57,10 @@ def create_venue(db: Session, payload: VenueCreate, owner_user_id: int) -> Venue
     # Auto-add owner as venue admin with role=owner
     admin = VenueAdmin(venue_id=venue.id, user_id=owner_user_id, role="owner")
     db.add(admin)
+    # Creating a venue makes the user a venue owner (grants staff-portal access)
+    owner = db.get(User, owner_user_id)
+    if owner and not owner.is_venue_owner:
+        owner.is_venue_owner = True
     db.commit()
     db.refresh(venue)
     return venue
@@ -79,16 +84,26 @@ def list_venues(db: Session, city: str = "", skip: int = 0, limit: int = 40) -> 
 
 def update_venue(db: Session, venue: Venue, payload: VenueUpdate) -> Venue:
     for key, val in payload.model_dump(exclude_unset=True).items():
-        if val:
-            setattr(venue, key, val)
+        if val is None:
+            continue
+        if key == "name" and not val.strip():
+            continue  # never blank out the venue name
+        setattr(venue, key, val)
     db.commit()
     db.refresh(venue)
     return venue
 
 
-def get_user_venue(db: Session, user_id: int) -> Venue | None:
-    """Return the venue owned by this user, if any."""
-    return db.query(Venue).filter(Venue.owner_user_id == user_id, Venue.is_active == True).first()  # noqa: E712
+def get_user_venue(db: Session, user_id: int, include_inactive: bool = False) -> Venue | None:
+    """Return the venue owned by this user, if any.
+
+    By default only active venues are returned. Pass include_inactive=True for
+    owner-facing flows (the owner must still see / not duplicate a suspended venue).
+    """
+    q = db.query(Venue).filter(Venue.owner_user_id == user_id)
+    if not include_inactive:
+        q = q.filter(Venue.is_active == True)  # noqa: E712
+    return q.first()
 
 
 def is_venue_staff(db: Session, venue_id: int, user_id: int) -> bool:
@@ -127,13 +142,33 @@ def get_listing(db: Session, listing_id: int) -> Listing | None:
     )
 
 
-def list_listings(db: Session, venue_id: int) -> list[Listing]:
-    return (
+def list_listings(db: Session, venue_id: int, include_inactive: bool = False) -> list[Listing]:
+    q = (
         db.query(Listing)
-        .options(joinedload(Listing.photos), joinedload(Listing.category))
-        .filter(Listing.venue_id == venue_id, Listing.is_active == True)  # noqa: E712
-        .all()
+        .options(
+            selectinload(Listing.photos),
+            joinedload(Listing.category),
+            selectinload(Listing.amenities),
+            selectinload(Listing.slots),
+        )
+        .filter(Listing.venue_id == venue_id)
     )
+    if not include_inactive:
+        q = q.filter(Listing.is_active == True)  # noqa: E712
+    return q.all()
+
+
+def update_listing(db: Session, listing: Listing, payload: ListingUpdate) -> Listing:
+    data = payload.model_dump(exclude_unset=True)
+    if "category_id" in data and data["category_id"] is not None:
+        if not db.get(ListingCategory, data["category_id"]):
+            raise ValueError("Category not found")
+    for key, val in data.items():
+        if val is not None:
+            setattr(listing, key, val)
+    db.commit()
+    db.refresh(listing)
+    return listing
 
 
 def add_listing_photo(db: Session, listing_id: int, url: str, caption: str = "", sort_order: int = 1) -> ListingPhoto:
@@ -173,6 +208,30 @@ def add_slot(db: Session, listing_id: int, payload: SlotCreate) -> ListingSlot:
     db.commit()
     db.refresh(slot)
     return slot
+
+
+class SlotInUseError(Exception):
+    """Raised when a slot cannot be deleted because bookings reference it."""
+
+
+def delete_slot(db: Session, slot_id: int, listing_id: int) -> bool:
+    slot = db.query(ListingSlot).filter(
+        ListingSlot.id == slot_id, ListingSlot.listing_id == listing_id
+    ).first()
+    if not slot:
+        return False
+    # bookings.slot_id is FK ondelete=RESTRICT — deleting a referenced slot would
+    # 500 on Postgres (or orphan rows on SQLite). Block it and tell the owner to
+    # cancel/complete those bookings first (or hide the listing instead).
+    booking_count = db.query(Booking).filter(Booking.slot_id == slot_id).count()
+    if booking_count:
+        raise SlotInUseError(
+            f"This slot has {booking_count} booking(s). Remove them first, "
+            f"or hide the listing instead of deleting the slot."
+        )
+    db.delete(slot)
+    db.commit()
+    return True
 
 
 # ── Bookings ──────────────────────────────────────────────────────────────────
@@ -217,6 +276,22 @@ def get_venue_bookings(db: Session, venue_id: int) -> list[Booking]:
     )
 
 
+def get_booking(db: Session, booking_id: int) -> Booking | None:
+    return db.get(Booking, booking_id)
+
+
+BOOKING_STATUSES = {"pending", "confirmed", "cancelled", "completed", "no_show"}
+
+
+def update_booking_status(db: Session, booking: Booking, status: str) -> Booking:
+    if status not in BOOKING_STATUSES:
+        raise ValueError(f"Status must be one of: {', '.join(sorted(BOOKING_STATUSES))}")
+    booking.status = status
+    db.commit()
+    db.refresh(booking)
+    return booking
+
+
 def serialize_listing(listing: Listing) -> dict:
     return {
         "id": listing.id,
@@ -243,6 +318,14 @@ def serialize_listing(listing: Listing) -> dict:
             for p in listing.photos
         ],
         "amenities": [a.label for a in listing.amenities],
+        "slots": [
+            {
+                "id": s.id, "day_of_week": s.day_of_week, "specific_date": s.specific_date,
+                "start_time": s.start_time, "end_time": s.end_time,
+                "max_bookings": s.max_bookings, "is_blocked": s.is_blocked,
+            }
+            for s in listing.slots
+        ],
     }
 
 
@@ -258,6 +341,7 @@ def serialize_venue(venue: Venue) -> dict:
         "email": venue.email,
         "website": venue.website,
         "address_line1": venue.address_line1,
+        "address_line2": venue.address_line2,
         "city": venue.city,
         "state": venue.state,
         "postal_code": venue.postal_code,

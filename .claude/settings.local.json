@@ -6,7 +6,23 @@
       "WebFetch(domain:21tsi.com)",
       "Bash(npx vite *)",
       "Bash(cp /c/Users/nikhil.jain_int/Downloads/championcircuit/frontend/public/branding/cc-full.png \"/c/Users/nikhil.jain_int/Downloads/champion-circuit-logo.png\")",
-      "Read(//c/Users/nikhil.jain_int/Downloads/**)"
+      "Read(//c/Users/nikhil.jain_int/Downloads/**)",
+      "Skill(run)",
+      "Bash(py --version)",
+      "Bash(pip list *)",
+      "Bash(npm install *)",
+      "Bash(backend/.venv/Scripts/python -c \"import fastapi, uvicorn; print\\('deps ready'\\)\")",
+      "Bash(.venv/Scripts/python -m uvicorn app.main:app --host 127.0.0.1 --port 8000)",
+      "Bash(npm run *)",
+      "Bash(curl -s -o /dev/null -w \"backend /docs -> %{http_code}\\\\n\" http://127.0.0.1:8000/docs)",
+      "Bash(curl -s -o /dev/null -w \"frontend -> %{http_code}\\\\n\" http://127.0.0.1:5173/)",
+      "Bash(curl -s http://127.0.0.1:8000/openapi.json)",
+      "Bash(curl -s http://127.0.0.1:5173/)",
+      "Bash(curl *)",
+      "Bash(python -c ' *)",
+      "Bash(python *)",
+      "Bash(DATABASE_URL=sqlite:///./import_check.db .venv/Scripts/python -c \"from app.main import app; print\\('import OK'\\); rs=[r.path+' '+','.join\\(r.methods\\) for r in app.routes if 'listing' in r.path or 'booking' in r.path]; print\\(chr\\(10\\).join\\(sorted\\(rs\\)\\)\\)\")",
+      "Bash(rm -f import_check.db)"
     ]
   }
 }

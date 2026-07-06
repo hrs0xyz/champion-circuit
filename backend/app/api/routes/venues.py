@@ -16,12 +16,14 @@ Venue owner / staff:
   POST /api/venues                  create venue
   PUT  /api/venues/{id}             update venue
   POST /api/venues/{id}/listings    add listing
-  PUT  /api/listings/{id}           update listing
+  PUT  /api/listings/{id}           update listing (partial)
   POST /api/listings/{id}/photos    upload photo (multipart)
   DELETE /api/listings/{id}/photos/{photo_id}
   POST /api/listings/{id}/amenities set amenities
   POST /api/listings/{id}/slots     add time slot
+  DELETE /api/listings/{id}/slots/{slot_id}
   GET  /api/venues/{id}/bookings    venue bookings
+  PUT  /api/bookings/{id}/status    update booking status
 """
 
 from pathlib import Path
@@ -38,7 +40,10 @@ from app.api.deps import get_current_user, get_optional_user
 from app.core.config import settings
 from app.db.session import get_db
 from app.models.user import User
-from app.schemas.venue import BookingCreate, ListingCreate, SlotCreate, VenueCreate, VenueUpdate
+from app.schemas.venue import (
+    BookingCreate, BookingStatusUpdate, ListingCreate, ListingUpdate,
+    SlotCreate, VenueCreate, VenueUpdate,
+)
 from app.services.venue import (
     add_listing_photo,
     add_slot,
@@ -46,7 +51,10 @@ from app.services.venue import (
     create_listing,
     create_venue,
     delete_listing_photo,
+    delete_slot,
+    SlotInUseError,
     get_all_categories,
+    get_booking,
     get_listing,
     get_user_bookings,
     get_user_venue,
@@ -58,6 +66,8 @@ from app.services.venue import (
     serialize_listing,
     serialize_venue,
     set_amenities,
+    update_booking_status,
+    update_listing,
     update_venue,
 )
 
@@ -115,7 +125,7 @@ def create_my_venue(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    existing = get_user_venue(db, current_user.id)
+    existing = get_user_venue(db, current_user.id, include_inactive=True)
     if existing and not current_user.is_admin:
         raise HTTPException(status_code=400, detail="You already have a venue. Contact admin to create more.")
     v = create_venue(db, payload, current_user.id)
@@ -150,6 +160,25 @@ def add_listing(
     if not current_user.is_admin and not is_venue_staff(db, venue_id, current_user.id):
         raise HTTPException(status_code=403, detail="Not authorised")
     listing = create_listing(db, venue_id, payload)
+    return serialize_listing(listing)
+
+
+@router.put("/listings/{listing_id}")
+def edit_listing(
+    listing_id: int,
+    payload: ListingUpdate,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    listing = get_listing(db, listing_id)
+    if not listing:
+        raise HTTPException(status_code=404, detail="Listing not found")
+    if not current_user.is_admin and not is_venue_staff(db, listing.venue_id, current_user.id):
+        raise HTTPException(status_code=403, detail="Not authorised")
+    try:
+        listing = update_listing(db, listing, payload)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
     return serialize_listing(listing)
 
 
@@ -245,6 +274,27 @@ def create_slot(
             "day_of_week": slot.day_of_week}
 
 
+@router.delete("/listings/{listing_id}/slots/{slot_id}")
+def remove_slot(
+    listing_id: int,
+    slot_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    listing = get_listing(db, listing_id)
+    if not listing:
+        raise HTTPException(status_code=404, detail="Listing not found")
+    if not current_user.is_admin and not is_venue_staff(db, listing.venue_id, current_user.id):
+        raise HTTPException(status_code=403, detail="Not authorised")
+    try:
+        deleted = delete_slot(db, slot_id, listing_id)
+    except SlotInUseError as e:
+        raise HTTPException(status_code=409, detail=str(e))
+    if not deleted:
+        raise HTTPException(status_code=404, detail="Slot not found")
+    return {"message": "Deleted"}
+
+
 @router.get("/venues/{venue_id}/bookings")
 def venue_bookings(
     venue_id: int,
@@ -266,6 +316,34 @@ def venue_bookings(
         }
         for b in bookings
     ]
+
+
+@router.put("/bookings/{booking_id}/status")
+def set_booking_status(
+    booking_id: int,
+    payload: BookingStatusUpdate,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Venue owner/staff (or admin) updates a booking's status."""
+    booking = get_booking(db, booking_id)
+    if not booking:
+        raise HTTPException(status_code=404, detail="Booking not found")
+    listing = get_listing(db, booking.listing_id)
+    if not listing:
+        raise HTTPException(status_code=404, detail="Listing not found")
+    if not current_user.is_admin and not is_venue_staff(db, listing.venue_id, current_user.id):
+        raise HTTPException(status_code=403, detail="Not authorised")
+    try:
+        booking = update_booking_status(db, booking, payload.status)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    return {
+        "id": booking.id, "listing_id": booking.listing_id,
+        "booking_date": booking.booking_date, "start_time": booking.start_time,
+        "end_time": booking.end_time, "status": booking.status,
+        "num_players": booking.num_players, "user_id": booking.user_id,
+    }
 
 
 # ── Bookings (user) ───────────────────────────────────────────────────────────

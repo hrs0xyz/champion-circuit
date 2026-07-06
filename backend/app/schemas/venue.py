@@ -16,6 +16,8 @@ class CategoryRead(BaseModel):
 class VenueCreate(BaseModel):
     name: str = Field(min_length=2, max_length=200)
     description: str = Field(default="", max_length=2000)
+    logo_url: str = Field(default="", max_length=500)
+    cover_url: str = Field(default="", max_length=500)
     phone: str = Field(default="", max_length=20)
     email: str = Field(default="", max_length=255)
     website: str = Field(default="", max_length=500)
@@ -84,6 +86,21 @@ class ListingCreate(BaseModel):
     is_tournament_eligible: bool = False
 
 
+class ListingUpdate(BaseModel):
+    """Partial update — only provided fields are applied."""
+    category_id: int | None = None
+    title: str | None = Field(default=None, min_length=2, max_length=200)
+    description: str | None = Field(default=None, max_length=2000)
+    rules: str | None = Field(default=None, max_length=2000)
+    capacity: int | None = Field(default=None, ge=0)
+    price_per_hour: int | None = Field(default=None, ge=0)
+    price_per_session: int | None = Field(default=None, ge=0)
+    duration_minutes: int | None = Field(default=None, ge=15)
+    is_bookable: bool | None = None
+    is_tournament_eligible: bool | None = None
+    is_active: bool | None = None
+
+
 class ListingRead(BaseModel):
     id: int
     venue_id: int
@@ -132,3 +149,8 @@ class BookingRead(BaseModel):
     status: str
     payment_status: str
     notes: str
+
+
+class BookingStatusUpdate(BaseModel):
+    # pending | confirmed | cancelled | completed | no_show
+    status: str = Field(max_length=20)

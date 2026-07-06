@@ -69,6 +69,24 @@ def _is_tournament_admin(db: Session, user: User, tournament_id: int) -> bool:
     ).first() is not None
 
 
+def _require_tournament_manage_access(db: Session, user: User, tournament_id: int) -> Tournament:
+    """
+    Gate for managing a tournament's match admins.
+    Super admin: any tournament. Venue owner: only tournaments at their own venue.
+    Returns the tournament or raises 403/404.
+    """
+    if not user.is_admin and not user.is_venue_owner:
+        raise HTTPException(status_code=403, detail="Not authorised")
+    t = db.get(Tournament, tournament_id)
+    if not t:
+        raise HTTPException(status_code=404, detail="Tournament not found")
+    if not user.is_admin:
+        my_venue = get_user_venue(db, user.id)
+        if not my_venue or t.venue_id != my_venue.id:
+            raise HTTPException(status_code=403, detail="You can only manage your own tournaments")
+    return t
+
+
 # ── Super Admin — Users ───────────────────────────────────────────────────────
 
 @router.get("/admin/stats")
@@ -232,19 +250,7 @@ def assign_match_admin(
     db: Session = Depends(get_db),
 ):
     """Assign a user as match admin for a tournament. Super admin or venue owner can do this."""
-    if not current_user.is_admin and not current_user.is_venue_owner:
-        raise HTTPException(status_code=403, detail="Not authorised")
-
-    t = db.get(Tournament, tournament_id)
-    if not t:
-        raise HTTPException(status_code=404, detail="Tournament not found")
-
-    # If venue owner, they can only assign to their own tournaments
-    if current_user.is_venue_owner and not current_user.is_admin:
-        from app.services.venue import get_user_venue
-        my_venue = get_user_venue(db, current_user.id)
-        if not my_venue or t.venue_id != my_venue.id:
-            raise HTTPException(status_code=403, detail="You can only assign admins to your own tournaments")
+    _require_tournament_manage_access(db, current_user, tournament_id)
 
     username = payload.get("username", "")
     from app.services.users import get_user_by_username
@@ -277,8 +283,7 @@ def remove_match_admin(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    if not current_user.is_admin and not current_user.is_venue_owner:
-        raise HTTPException(status_code=403, detail="Not authorised")
+    _require_tournament_manage_access(db, current_user, tournament_id)
     ta = db.query(TournamentAdmin).filter(
         TournamentAdmin.tournament_id == tournament_id,
         TournamentAdmin.user_id == user_id,
@@ -296,8 +301,7 @@ def list_tournament_admins(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    if not current_user.is_admin and not current_user.is_venue_owner:
-        raise HTTPException(status_code=403, detail="Not authorised")
+    _require_tournament_manage_access(db, current_user, tournament_id)
     admins = db.query(TournamentAdmin).filter(
         TournamentAdmin.tournament_id == tournament_id
     ).all()
@@ -317,11 +321,14 @@ def my_venue(
     db: Session = Depends(get_db),
 ):
     _require_venue_staff(current_user)
-    v = get_user_venue(db, current_user.id)
+    # include_inactive: a suspended owner must still see their venue (not be
+    # funnelled into creating a duplicate), and the UI shows a "Suspended" state.
+    v = get_user_venue(db, current_user.id, include_inactive=True)
     if not v:
         return {"venue": None, "message": "No venue found. Create one first."}
     from app.services.venue import list_listings, serialize_listing, get_venue_bookings
-    listings = list_listings(db, v.id)
+    # Owners see inactive (hidden) listings too, so they can re-activate them
+    listings = list_listings(db, v.id, include_inactive=True)
     bookings = get_venue_bookings(db, v.id)
     return {
         "venue": serialize_venue(v),

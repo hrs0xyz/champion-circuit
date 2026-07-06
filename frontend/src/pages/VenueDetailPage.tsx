@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useParams, useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { ccApi, type Category, type Review, type Venue, type VenueListing, ApiError } from '../lib/ccApi';
@@ -46,14 +46,15 @@ function priceLabel(listing: VenueListing) {
 }
 
 // ── Listing Detail Modal ──────────────────────────────────────────────────────
+// Currently unused (inline listing cards replaced the modal) — kept for reuse.
 
-function ListingDetailModal({
+export function ListingDetailModal({
   listing: l,
   venueName,
   venuePhone,
   onClose,
   onInquiry,
-  user,
+  user: _user,
 }: {
   listing: VenueListing;
   venueName: string;

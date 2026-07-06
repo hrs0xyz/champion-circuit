@@ -51,6 +51,7 @@ export default function App() {
 
               {/* ── Staff portals (no public layout, full screen) ── */}
               <Route path="staff-login" element={<StaffLoginPage />} />
+              <Route path="partner-login" element={<StaffLoginPage />} />
               <Route path="staff/admin" element={<SuperAdminPage />} />
               <Route path="staff/venue" element={<TurfOwnerPage />} />
               <Route path="staff/match" element={<MatchAdminPage />} />

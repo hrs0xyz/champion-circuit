@@ -1,6 +1,6 @@
 /**
- * Hidden staff login — not linked from any public page.
- * Access: type /staff-login directly in the browser.
+ * Hidden partner/staff login — not linked from any public page.
+ * Access: type /partner-login (or /staff-login) directly in the browser.
  *
  * On successful login:
  *  - is_admin=true  → /staff/admin
@@ -54,11 +54,11 @@ export function StaffLoginPage() {
     <div className="staff-login-page">
       <div className="staff-login-card">
         <img src="/branding/cc-mark.png" alt="Champion Circuit" className="staff-login-logo" />
-        <p className="staff-login-eyebrow">Staff Portal</p>
+        <p className="staff-login-eyebrow">Partner Portal</p>
         <h1 className="staff-login-title">Sign in</h1>
         <p className="staff-login-sub">
-          This page is for Champion Circuit staff only.<br />
-          Not for regular users.
+          For turf owners &amp; Champion Circuit staff.<br />
+          Not for regular players.
         </p>
 
         <form className="auth-form" onSubmit={(e) => void handleSubmit(e)}>

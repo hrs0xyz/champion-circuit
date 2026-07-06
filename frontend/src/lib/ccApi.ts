@@ -39,6 +39,15 @@ export interface Category {
 
 export interface VenuePhoto { id: number; url: string; caption: string; sort_order: number; }
 
+export interface ListingSlot {
+  id: number;
+  /** 0=Mon … 6=Sun, -1 = specific date */
+  day_of_week: number;
+  specific_date: string;
+  start_time: string; end_time: string;
+  max_bookings: number; is_blocked: boolean;
+}
+
 export interface VenueListing {
   id: number; venue_id: number;
   category: Category;
@@ -48,13 +57,15 @@ export interface VenueListing {
   is_active: boolean;
   photos: VenuePhoto[];
   amenities: string[];
+  slots: ListingSlot[];
 }
 
 export interface Venue {
   id: number; name: string; slug: string;
   description: string; logo_url: string; cover_url: string;
   phone: string; email: string; website: string;
-  address_line1: string; city: string; state: string; postal_code: string;
+  address_line1: string; address_line2?: string;
+  city: string; state: string; postal_code: string;
   lat: string; lng: string;
   is_verified: boolean; is_active: boolean;
   listings?: VenueListing[];
@@ -64,6 +75,20 @@ export interface Booking {
   id: number; listing_id: number;
   booking_date: string; start_time: string; end_time: string;
   status: string; payment_status: string; num_players: number;
+}
+
+/** Booking row as returned to venue owners/staff */
+export interface StaffBooking {
+  id: number; listing_id: number;
+  booking_date: string; start_time: string; end_time: string;
+  status: string; num_players?: number; user_id: number | null;
+}
+
+export interface MyVenueData {
+  venue: Venue | null;
+  listings?: VenueListing[];
+  bookings?: StaffBooking[];
+  message?: string;
 }
 
 export interface MatchParticipant {
@@ -145,6 +170,8 @@ export const ccApi = {
     req<Venue>(`/api/venues/${id}`, { method: 'PUT', body: JSON.stringify(payload) }),
   addListing: (venueId: number, payload: object) =>
     req<VenueListing>(`/api/venues/${venueId}/listings`, { method: 'POST', body: JSON.stringify(payload) }),
+  updateListing: (listingId: number, payload: object) =>
+    req<VenueListing>(`/api/listings/${listingId}`, { method: 'PUT', body: JSON.stringify(payload) }),
   uploadListingPhoto: (listingId: number, file: File, sortOrder = 1, caption = '') => {
     const form = new FormData();
     form.append('file', file);
@@ -153,13 +180,29 @@ export const ccApi = {
       { method: 'POST', body: form }
     );
   },
+  deleteListingPhoto: (listingId: number, photoId: number) =>
+    req<{ message: string }>(`/api/listings/${listingId}/photos/${photoId}`, { method: 'DELETE' }),
   setAmenities: (listingId: number, labels: string[]) =>
     req<{ message: string }>(`/api/listings/${listingId}/amenities`, {
       method: 'POST', body: JSON.stringify(labels),
     }),
   addSlot: (listingId: number, payload: object) =>
     req<object>(`/api/listings/${listingId}/slots`, { method: 'POST', body: JSON.stringify(payload) }),
+  deleteSlot: (listingId: number, slotId: number) =>
+    req<{ message: string }>(`/api/listings/${listingId}/slots/${slotId}`, { method: 'DELETE' }),
   venueBookings: (venueId: number) => req<Booking[]>(`/api/venues/${venueId}/bookings`),
+  updateBookingStatus: (bookingId: number, bookingStatus: string) =>
+    req<StaffBooking>(`/api/bookings/${bookingId}/status`, {
+      method: 'PUT', body: JSON.stringify({ status: bookingStatus }),
+    }),
+
+  // Staff portal (venue owner)
+  myVenue: () => req<MyVenueData>('/api/staff/my-venue'),
+  myTournaments: () => req<Tournament[]>('/api/staff/my-tournaments'),
+  assignMatchAdmin: (tournamentId: number, username: string) =>
+    req<{ message: string }>(`/api/admin/tournaments/${tournamentId}/assign-match-admin`, {
+      method: 'POST', body: JSON.stringify({ username }),
+    }),
 
   // Bookings
   book: (payload: object) =>
