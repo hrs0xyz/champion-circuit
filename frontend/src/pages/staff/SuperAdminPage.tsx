@@ -361,7 +361,7 @@ function AdminVouchersTab() {
   // Use ccApi browse
   useEffect(() => {
     import('../../lib/voucherApi').then(({ voucherApi }) => {
-      voucherApi.browse().then((data) => setVouchers(data as unknown as Array<Record<string, unknown>>)).catch(() => {});
+      voucherApi.browse().then((data) => setVouchers(data as Array<Record<string, unknown>>)).catch(() => {});
     });
   }, []);
 
