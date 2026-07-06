@@ -1,8 +1,8 @@
-from pathlib import Path
+# from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
+# from fastapi.staticfiles import StaticFiles
 
 from app.api.routes import admin, auth, health, matches, reviews, uploads, users, venues, vouchers, activity
 from app.core.config import settings
@@ -17,13 +17,15 @@ from app.models import voucher as _voucher_model    # noqa: F401
 from app.models import waitlist as _waitlist_model  # noqa: F401
 from app.models import activity as _activity_model  # noqa: F401
 
+
+
 # ── Create all tables (idempotent) ────────────────────────────────────────────
 Base.metadata.create_all(bind=engine)
 ensure_dev_schema()  # add missing columns to existing SQLite DBs
 
 # ── Ensure upload directories exist ──────────────────────────────────────────
-Path(settings.UPLOAD_DIR).mkdir(parents=True, exist_ok=True)
-Path(settings.UPLOAD_DIR, "listings").mkdir(parents=True, exist_ok=True)
+# Path(settings.UPLOAD_DIR).mkdir(parents=True, exist_ok=True)
+# Path(settings.UPLOAD_DIR, "listings").mkdir(parents=True, exist_ok=True)
 
 app = FastAPI(
     title=settings.APP_NAME,
@@ -55,4 +57,4 @@ app.include_router(reviews.router,  prefix="/api",          tags=["reviews"])
 app.include_router(activity.router, prefix="/api",          tags=["activity"])
 
 # ── Static file serving ───────────────────────────────────────────────────────
-app.mount("/uploads", StaticFiles(directory=settings.UPLOAD_DIR), name="uploads")
+# app.mount("/uploads", StaticFiles(directory=settings.UPLOAD_DIR), name="uploads")

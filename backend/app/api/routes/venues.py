@@ -30,6 +30,10 @@ from uuid import uuid4
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 from sqlalchemy.orm import Session
 
+import cloudinary
+import cloudinary.uploader
+
+
 from app.api.deps import get_current_user, get_optional_user
 from app.core.config import settings
 from app.db.session import get_db
@@ -168,12 +172,22 @@ async def upload_listing_photo(
     data = await file.read()
     if len(data) > MAX_IMG:
         raise HTTPException(status_code=400, detail="Image must be 5 MB or smaller")
-    upload_dir = Path(settings.UPLOAD_DIR) / "listings"
-    upload_dir.mkdir(parents=True, exist_ok=True)
-    ext = ALLOWED_IMG[file.content_type]
-    filename = f"listing-{listing_id}-{uuid4().hex}{ext}"
-    (upload_dir / filename).write_bytes(data)
-    url = f"{settings.PUBLIC_BASE_URL}/uploads/listings/{filename}"
+    # upload_dir = Path(settings.UPLOAD_DIR) / "listings"
+    # upload_dir.mkdir(parents=True, exist_ok=True)
+    # ext = ALLOWED_IMG[file.content_type]
+    # filename = f"listing-{listing_id}-{uuid4().hex}{ext}"
+    # (upload_dir / filename).write_bytes(data)
+    # url = f"{settings.PUBLIC_BASE_URL}/uploads/listings/{filename}"
+
+    result = cloudinary.uploader.upload(
+        data,
+        folder="champion-circuit/listings",
+        public_id=f"listing-{listing_id}-{uuid4().hex}",
+        overwrite=True,
+        resource_type="image",
+    )
+
+    url = result["secure_url"]
     try:
         photo = add_listing_photo(db, listing_id, url, caption, sort_order)
     except ValueError as e:

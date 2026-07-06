@@ -13,7 +13,7 @@ class Settings(BaseSettings):
     BACKEND_CORS_ORIGINS: str = "http://localhost:5173,http://127.0.0.1:5173"
     GOOGLE_CLIENT_ID: str = ""
     PUBLIC_BASE_URL: str = "http://127.0.0.1:8000"
-    UPLOAD_DIR: str = "uploads"
+    # UPLOAD_DIR: str = "uploads"
     SMTP_HOST: str = ""
     SMTP_PORT: int = 587
     SMTP_USERNAME: str = ""
@@ -21,6 +21,9 @@ class Settings(BaseSettings):
     SMTP_FROM_EMAIL: str = ""
     RAZORPAY_KEY_ID: str = ""
     RAZORPAY_KEY_SECRET: str = ""
+    CLOUDINARY_CLOUD_NAME: str = ""
+    CLOUDINARY_API_KEY: str = ""
+    CLOUDINARY_API_SECRET: str = ""
 
     @property
     def cors_origins(self) -> list[str]:

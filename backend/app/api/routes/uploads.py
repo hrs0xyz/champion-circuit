@@ -8,6 +8,8 @@ from app.api.deps import get_current_user
 from app.core.config import settings
 from app.db.session import get_db
 from app.models.user import User
+from app.services.cloudinary_service import upload_image
+
 
 router = APIRouter()
 
@@ -28,15 +30,25 @@ async def upload_avatar(
     if len(data) > MAX_BYTES:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Image must be 3MB or smaller")
 
-    upload_dir = Path(settings.UPLOAD_DIR)
-    upload_dir.mkdir(parents=True, exist_ok=True)
-    ext = ALLOWED_TYPES[file.content_type]
-    filename = f"avatar-{current_user.id}-{uuid4().hex}{ext}"
-    path = upload_dir / filename
-    path.write_bytes(data)
+    # upload_dir = Path(settings.UPLOAD_DIR)
+    # upload_dir.mkdir(parents=True, exist_ok=True)
+    # ext = ALLOWED_TYPES[file.content_type]
+    # filename = f"avatar-{current_user.id}-{uuid4().hex}{ext}"
+    # path = upload_dir / filename
+    # path.write_bytes(data)
 
-    # Persist the avatar URL on the user record
-    url = f"{settings.PUBLIC_BASE_URL}/uploads/{filename}"
+    # # Persist the avatar URL on the user record
+    # url = f"{settings.PUBLIC_BASE_URL}/uploads/{filename}"
+
+    
+    ext = ALLOWED_TYPES[file.content_type]
+
+    result = upload_image(
+        data,
+        folder="champion-circuit/avatars",
+    )
+
+    url = result
     current_user.avatar_url = url
     db.commit()
 
