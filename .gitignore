@@ -78,3 +78,4 @@ user-FLOW.TXT
 
 # ── KiroGraph index (local only) ─────────────────────────────────────────────
 .kirograph/
+.DS_Store
