@@ -107,7 +107,7 @@ listing_data = [
         "category": cricket_cat,
         "title": "Cricket Turf A",
         "description": "Full-pitch floodlit cricket turf. Synthetic surface, changing rooms included.",
-        "capacity": 22,
+        "capacity": "22",
         "price_per_hour": 150000,  # ₹1500 in paise
         "duration_minutes": 120,
         "is_bookable": True,
@@ -117,7 +117,7 @@ listing_data = [
         "category": badminton_cat,
         "title": "Badminton Court 1",
         "description": "Wooden flooring, BWF-standard net. Air-conditioned.",
-        "capacity": 4,
+        "capacity": "4",
         "price_per_hour": 60000,  # ₹600
         "duration_minutes": 60,
         "is_bookable": True,
@@ -127,7 +127,7 @@ listing_data = [
         "category": ps_cat,
         "title": "PlayStation 5 Gaming Pod",
         "description": "Private PS5 gaming pod with 55\" 4K TV, racing wheel, and FIFA/EA FC.",
-        "capacity": 2,
+        "capacity": "2",
         "price_per_session": 25000,  # ₹250 per session
         "duration_minutes": 60,
         "is_bookable": True,

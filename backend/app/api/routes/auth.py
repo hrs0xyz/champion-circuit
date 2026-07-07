@@ -118,5 +118,5 @@ def google_login(payload: GoogleAuthRequest, db: Session = Depends(get_db)) -> T
 
 
 @router.get("/me", response_model=UserRead)
-def me(current_user: User = Depends(get_current_user)) -> dict:
-    return serialize_user(current_user)
+def me(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> dict:
+    return serialize_user(current_user, db)

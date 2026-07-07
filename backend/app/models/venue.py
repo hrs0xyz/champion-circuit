@@ -114,7 +114,8 @@ class Listing(Base):
     title: Mapped[str] = mapped_column(String(200), nullable=False)
     description: Mapped[str] = mapped_column(Text, default="", nullable=False)
     rules: Mapped[str] = mapped_column(Text, default="", nullable=False)
-    capacity: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    # Free-form capacity: a single number ("10") or a range ("5-10"), or blank.
+    capacity: Mapped[str] = mapped_column(String(20), default="", nullable=False)
     price_per_hour: Mapped[int] = mapped_column(Integer, default=0, nullable=False)   # paise
     price_per_session: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     currency: Mapped[str] = mapped_column(String(10), default="INR", nullable=False)

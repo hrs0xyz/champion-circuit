@@ -42,7 +42,12 @@ export function MatchAdminPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!user) { navigate('/staff-login', { replace: true }); return; }
+    if (!user) { navigate('/partner-login', { replace: true }); return; }
+    // Only staff (match admin / owner / super admin) may view this portal.
+    if (!user.is_match_admin && !user.is_venue_owner && !user.is_admin) {
+      navigate('/partner-login', { replace: true });
+      return;
+    }
     // Fetch all tournaments to find ones this user is assigned to
     ccApi.tournaments()
       .then((ts) => { setTournaments(ts); if (ts.length > 0) selectTournament(ts[0]); })
@@ -66,6 +71,9 @@ export function MatchAdminPage() {
       setLoading(false);
     }
   }
+
+  // Non-staff are redirected by the effect above — render nothing meanwhile.
+  if (user && !user.is_match_admin && !user.is_venue_owner && !user.is_admin) return null;
 
   if (loading && !selected) return (
     <div className="staff-shell">

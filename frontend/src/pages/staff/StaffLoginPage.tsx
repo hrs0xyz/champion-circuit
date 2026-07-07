@@ -8,7 +8,7 @@
  *  - tournament admin → /staff/match
  *  - none of the above → "no staff access" error
  */
-import { useState, type FormEvent } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { api, ApiError } from '../../lib/api';
@@ -21,6 +21,19 @@ export function StaffLoginPage() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
+  // Redirect / gate based on role once a user is loaded. Doing this in an
+  // effect (not during render) avoids the stale, inconsistent behaviour where
+  // a plain player could slip into a staff page on first load.
+  useEffect(() => {
+    if (!user) return;
+    if (user.is_admin) { navigate('/staff/admin', { replace: true }); return; }
+    if (user.is_venue_owner) { navigate('/staff/venue', { replace: true }); return; }
+    if (user.is_match_admin) { navigate('/staff/match', { replace: true }); return; }
+    // Signed in, but this account has no partner/staff role → block (no redirect).
+    setError(`This account (@${user.username}) doesn't have partner or staff access. Sign in with your turf-owner account below.`);
+    setLoading(false);
+  }, [user, navigate]);
+
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setError('');
@@ -28,25 +41,15 @@ export function StaffLoginPage() {
     try {
       const res = await api.login(identifier.trim(), password);
       await setToken(res.access_token);
-      // setToken fetches /me — check role after
+      // The effect above handles role-gating / redirect once /me loads.
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Login failed.');
       setLoading(false);
-      return;
     }
-    setLoading(false);
   }
 
-  // After token is set, user is loaded — redirect based on role
-  if (user) {
-    if (user.is_admin) {
-      navigate('/staff/admin', { replace: true });
-    } else if (user.is_venue_owner) {
-      navigate('/staff/venue', { replace: true });
-    } else {
-      // Could be a match admin — send to match admin portal
-      navigate('/staff/match', { replace: true });
-    }
+  // A staff user is being redirected by the effect — render nothing meanwhile.
+  if (user && (user.is_admin || user.is_venue_owner || user.is_match_admin)) {
     return null;
   }
 

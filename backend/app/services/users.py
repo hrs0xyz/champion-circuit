@@ -22,9 +22,18 @@ def _load(value: str) -> list[str]:
         return []
 
 
-def serialize_user(user: User) -> dict:
+def _is_match_admin(db: Session | None, user: User) -> bool:
+    """True if the user is assigned as a match admin on any tournament."""
+    if db is None:
+        return False
+    from app.models.match import TournamentAdmin
+    return db.query(TournamentAdmin.id).filter(TournamentAdmin.user_id == user.id).first() is not None
+
+
+def serialize_user(user: User, db: Session | None = None) -> dict:
     return {
         "id": user.id,
+        "is_match_admin": _is_match_admin(db, user),
         "username": user.username,
         "email": user.email,
         "name": user.name,

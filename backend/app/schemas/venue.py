@@ -1,4 +1,24 @@
-from pydantic import BaseModel, Field
+import re
+
+from pydantic import BaseModel, Field, field_validator
+
+# Capacity: blank, a single number ("10"), or a range ("5-10").
+CAPACITY_RE = re.compile(r"^(\d{1,6}(-\d{1,6})?)?$")
+
+
+def _validate_capacity(v: str | None) -> str | None:
+    if v is None:
+        return v
+    v = v.strip()
+    if v == "":
+        return ""
+    if not CAPACITY_RE.match(v):
+        raise ValueError('Capacity must be a number (e.g. "10") or a range (e.g. "5-10")')
+    if "-" in v:
+        low, high = (int(x) for x in v.split("-"))
+        if low > high:
+            raise ValueError("Capacity range must be low-high (e.g. 5-10)")
+    return v
 
 
 # ── Categories ────────────────────────────────────────────────────────────────
@@ -78,12 +98,17 @@ class ListingCreate(BaseModel):
     title: str = Field(min_length=2, max_length=200)
     description: str = Field(default="", max_length=2000)
     rules: str = Field(default="", max_length=2000)
-    capacity: int = Field(default=0, ge=0)
+    capacity: str = Field(default="", max_length=20)
     price_per_hour: int = Field(default=0, ge=0)
     price_per_session: int = Field(default=0, ge=0)
     duration_minutes: int = Field(default=60, ge=15)
     is_bookable: bool = True
     is_tournament_eligible: bool = False
+
+    @field_validator("capacity")
+    @classmethod
+    def _cap(cls, v: str) -> str:
+        return _validate_capacity(v) or ""
 
 
 class ListingUpdate(BaseModel):
@@ -92,13 +117,18 @@ class ListingUpdate(BaseModel):
     title: str | None = Field(default=None, min_length=2, max_length=200)
     description: str | None = Field(default=None, max_length=2000)
     rules: str | None = Field(default=None, max_length=2000)
-    capacity: int | None = Field(default=None, ge=0)
+    capacity: str | None = Field(default=None, max_length=20)
     price_per_hour: int | None = Field(default=None, ge=0)
     price_per_session: int | None = Field(default=None, ge=0)
     duration_minutes: int | None = Field(default=None, ge=15)
     is_bookable: bool | None = None
     is_tournament_eligible: bool | None = None
     is_active: bool | None = None
+
+    @field_validator("capacity")
+    @classmethod
+    def _cap(cls, v: str | None) -> str | None:
+        return _validate_capacity(v)
 
 
 class ListingRead(BaseModel):
@@ -108,7 +138,7 @@ class ListingRead(BaseModel):
     title: str
     description: str
     rules: str
-    capacity: int
+    capacity: str
     price_per_hour: int
     price_per_session: int
     duration_minutes: int

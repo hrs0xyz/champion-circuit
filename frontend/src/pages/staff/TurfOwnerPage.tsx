@@ -50,8 +50,12 @@ export function TurfOwnerPage() {
   }, [notify]);
 
   useEffect(() => {
-    if (!user) { navigate('/staff-login', { replace: true }); return; }
-    if (!user.is_venue_owner && !user.is_admin) { navigate('/staff/match', { replace: true }); return; }
+    if (!user) { navigate('/partner-login', { replace: true }); return; }
+    if (!user.is_venue_owner && !user.is_admin) {
+      // Match admins belong on the match portal; everyone else is blocked.
+      navigate(user.is_match_admin ? '/staff/match' : '/partner-login', { replace: true });
+      return;
+    }
     Promise.all([reload(), ccApi.categories().then(setCats)])
       .catch(() => notify('Could not load venue data.', 'err'))
       .finally(() => setLoading(false));
@@ -139,6 +143,8 @@ function VenueOverview({ venue, listings, bookings, goTo }: {
 
   const activeCount = listings.filter((l) => l.is_active).length;
   const pendingCount = bookings.filter((b) => b.status === 'pending').length;
+  // Venue's sports are derived from its listings' categories (auto, never stale).
+  const sports = [...new Set(listings.map((l) => l.category?.name).filter(Boolean))] as string[];
 
   return (
     <div className="staff-section">
@@ -172,10 +178,23 @@ function VenueOverview({ venue, listings, bookings, goTo }: {
         </div>
       </div>
 
-      <div className="staff-venue-overview" style={{ marginTop: 20 }}>
+      {sports.length > 0 && (
+        <div className="staff-chip-row" style={{ marginTop: 20 }}>
+          <span className="staff-subsection__title" style={{ marginRight: 4 }}>Sports offered</span>
+          {sports.map((s) => <span key={s} className="staff-chip">{s}</span>)}
+        </div>
+      )}
+
+      <div className="staff-venue-overview" style={{ marginTop: 16 }}>
         <div className="staff-venue-overview__row"><span>City</span><strong>{venue.city || '—'}</strong></div>
-        <div className="staff-venue-overview__row"><span>Address</span><strong>{venue.address_line1 || '—'}</strong></div>
+        <div className="staff-venue-overview__row"><span>Address</span><strong>{[venue.address_line1, venue.address_line2].filter(Boolean).join(', ') || '—'}</strong></div>
         <div className="staff-venue-overview__row"><span>Phone</span><strong>{venue.phone || '—'}</strong></div>
+        <div className="staff-venue-overview__row">
+          <span>Website</span>
+          <strong>{venue.website
+            ? <a href={venue.website} target="_blank" rel="noreferrer" className="auth-label-link">{venue.website}</a>
+            : '—'}</strong>
+        </div>
         <div className="staff-venue-overview__row">
           <span>Verified</span>
           <strong>{venue.is_verified ? '✓ Yes' : '✗ Pending review'}</strong>
@@ -309,20 +328,24 @@ function ListingsPanel({ venueId, listings, cats, onChanged, onMsg }: {
   const [creating, setCreating] = useState(false);
   const [saving, setSaving] = useState(false);
   const [expandedId, setExpandedId] = useState<number | null>(null);
-  const [form, setForm] = useState({
-    category_id: 0, title: '', description: '', capacity: 0,
+  const emptyForm = {
+    category_id: 0, title: '', description: '', capacity: '',
     price_per_hour: 0, duration_minutes: 60, is_bookable: true, is_tournament_eligible: false,
-  });
+  };
+  const [form, setForm] = useState(emptyForm);
 
   async function handleCreate(e: FormEvent) {
     e.preventDefault();
     if (saving) return;
     if (!form.category_id) { onMsg('Pick a category for the listing.', 'err'); return; }
+    if (form.capacity && !/^\d{1,6}(-\d{1,6})?$/.test(form.capacity.trim())) {
+      onMsg('Capacity must be a number (e.g. 10) or a range (e.g. 5-10).', 'err'); return;
+    }
     setSaving(true);
     try {
-      await ccApi.addListing(venueId, form);
+      await ccApi.addListing(venueId, { ...form, capacity: form.capacity.trim() });
       setCreating(false);
-      setForm({ category_id: 0, title: '', description: '', capacity: 0, price_per_hour: 0, duration_minutes: 60, is_bookable: true, is_tournament_eligible: false });
+      setForm(emptyForm);
       onMsg('Listing created — it is now visible to players.');
       onChanged();
     } catch (err) {
@@ -331,6 +354,8 @@ function ListingsPanel({ venueId, listings, cats, onChanged, onMsg }: {
       setSaving(false);
     }
   }
+
+  const sports = [...new Set(listings.map((l) => l.category?.name).filter(Boolean))] as string[];
 
   return (
     <div className="staff-section">
@@ -341,19 +366,42 @@ function ListingsPanel({ venueId, listings, cats, onChanged, onMsg }: {
         </button>
       </div>
 
+      {sports.length > 0 && (
+        <div className="staff-chip-row" style={{ marginBottom: 16 }}>
+          <span className="staff-subsection__title" style={{ marginRight: 4 }}>Categories</span>
+          {sports.map((s) => <span key={s} className="staff-chip">{s}</span>)}
+        </div>
+      )}
+
       {creating && (
         <form className="staff-create-form" onSubmit={(e) => void handleCreate(e)}>
-          <select className="auth-input" value={form.category_id} onChange={(e) => setForm({ ...form, category_id: Number(e.target.value) })} required>
-            <option value={0}>Select category</option>
-            {cats.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-          </select>
-          <input className="auth-input" placeholder="Title (e.g. Cricket Turf A)" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} required minLength={2} />
-          <input className="auth-input" placeholder="Description" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
-          <input className="auth-input" type="number" min={0} placeholder="Capacity (players)" value={form.capacity || ''} onChange={(e) => setForm({ ...form, capacity: Number(e.target.value) })} />
-          <input className="auth-input" type="number" min={0} step="0.01" placeholder="Price per hour (₹, 0=free)" value={form.price_per_hour / 100 || ''} onChange={(e) => setForm({ ...form, price_per_hour: Math.round(Number(e.target.value) * 100) })} />
-          <input className="auth-input" type="number" min={15} placeholder="Session duration (minutes)" value={form.duration_minutes} onChange={(e) => setForm({ ...form, duration_minutes: Number(e.target.value) })} />
-          <label className="staff-checkbox"><input type="checkbox" checked={form.is_bookable} onChange={(e) => setForm({ ...form, is_bookable: e.target.checked })} /> Bookable online</label>
-          <label className="staff-checkbox"><input type="checkbox" checked={form.is_tournament_eligible} onChange={(e) => setForm({ ...form, is_tournament_eligible: e.target.checked })} /> Tournament eligible</label>
+          <div className="staff-form-grid">
+            <label className="auth-label">Category *
+              <select className="auth-input" value={form.category_id} onChange={(e) => setForm({ ...form, category_id: Number(e.target.value) })} required>
+                <option value={0}>Select category</option>
+                {cats.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+              </select>
+            </label>
+            <label className="auth-label">Title *
+              <input className="auth-input" placeholder="e.g. Cricket Turf A" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} required minLength={2} />
+            </label>
+            <label className="auth-label">Capacity (players)
+              <input className="auth-input" inputMode="numeric" pattern="\d{1,6}(-\d{1,6})?" placeholder="e.g. 10 or 5-10 (optional)" value={form.capacity} onChange={(e) => setForm({ ...form, capacity: e.target.value })} title="A number (10) or a range (5-10)" />
+            </label>
+            <label className="auth-label">Price per hour (₹)
+              <input className="auth-input" inputMode="numeric" placeholder="0 = free" value={form.price_per_hour ? String(form.price_per_hour / 100) : ''} onChange={(e) => { const d = e.target.value.replace(/[^0-9]/g, ''); setForm({ ...form, price_per_hour: d ? parseInt(d, 10) * 100 : 0 }); }} />
+            </label>
+            <label className="auth-label">Session duration (minutes)
+              <input className="auth-input" inputMode="numeric" value={form.duration_minutes ? String(form.duration_minutes) : ''} onChange={(e) => { const d = e.target.value.replace(/[^0-9]/g, ''); setForm({ ...form, duration_minutes: d ? parseInt(d, 10) : 0 }); }} />
+            </label>
+          </div>
+          <label className="auth-label">Description
+            <input className="auth-input" placeholder="Short description players will see" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
+          </label>
+          <div className="staff-inline-form" style={{ flexWrap: 'wrap' }}>
+            <label className="staff-checkbox"><input type="checkbox" checked={form.is_bookable} onChange={(e) => setForm({ ...form, is_bookable: e.target.checked })} /> Bookable online</label>
+            <label className="staff-checkbox"><input type="checkbox" checked={form.is_tournament_eligible} onChange={(e) => setForm({ ...form, is_tournament_eligible: e.target.checked })} /> Tournament eligible</label>
+          </div>
           <button type="submit" className="btn btn-primary" disabled={saving}>{saving ? 'Creating…' : 'Create listing'}</button>
         </form>
       )}
@@ -386,7 +434,7 @@ function ListingCard({ listing, cats, expanded, onToggle, onChanged, onMsg }: {
         <div>
           <h3 className="staff-card__title">{listing.title}</h3>
           <p className="staff-card__meta">
-            {listing.category?.name ?? '—'} · {listing.capacity} max · ₹{listing.price_per_hour / 100}/hr · {listing.photos.length}/5 photos · {listing.slots.length} slots
+            {listing.category?.name ?? '—'}{listing.capacity ? ` · ${listing.capacity} players` : ''} · ₹{listing.price_per_hour / 100}/hr · {listing.photos.length}/5 photos · {listing.slots.length} slots
           </p>
         </div>
         <div className="staff-card__badges">
@@ -433,9 +481,12 @@ function ListingEditForm({ listing, cats, onChanged, onMsg }: {
 
   async function handleSave(e: FormEvent) {
     e.preventDefault();
+    if (form.capacity && !/^\d{1,6}(-\d{1,6})?$/.test(form.capacity.trim())) {
+      onMsg('Capacity must be a number (e.g. 10) or a range (e.g. 5-10).', 'err'); return;
+    }
     setSaving(true);
     try {
-      await ccApi.updateListing(listing.id, form);
+      await ccApi.updateListing(listing.id, { ...form, capacity: form.capacity.trim() });
       onMsg('Listing updated — changes are live.');
       onChanged();
     } catch (err) {
@@ -458,16 +509,16 @@ function ListingEditForm({ listing, cats, onChanged, onMsg }: {
           </select>
         </label>
         <label className="auth-label">Capacity (players)
-          <input className="auth-input" type="number" min={0} value={form.capacity} onChange={(e) => setForm({ ...form, capacity: Number(e.target.value) })} />
+          <input className="auth-input" inputMode="numeric" pattern="\d{1,6}(-\d{1,6})?" placeholder="e.g. 10 or 5-10" title="A number (10) or a range (5-10)" value={form.capacity} onChange={(e) => setForm({ ...form, capacity: e.target.value })} />
         </label>
         <label className="auth-label">Price / hour (₹)
-          <input className="auth-input" type="number" min={0} step="0.01" value={form.price_per_hour / 100} onChange={(e) => setForm({ ...form, price_per_hour: Math.round(Number(e.target.value) * 100) })} />
+          <input className="auth-input" inputMode="numeric" value={form.price_per_hour ? String(form.price_per_hour / 100) : ''} onChange={(e) => { const d = e.target.value.replace(/[^0-9]/g, ''); setForm({ ...form, price_per_hour: d ? parseInt(d, 10) * 100 : 0 }); }} />
         </label>
         <label className="auth-label">Price / session (₹)
-          <input className="auth-input" type="number" min={0} step="0.01" value={form.price_per_session / 100} onChange={(e) => setForm({ ...form, price_per_session: Math.round(Number(e.target.value) * 100) })} />
+          <input className="auth-input" inputMode="numeric" value={form.price_per_session ? String(form.price_per_session / 100) : ''} onChange={(e) => { const d = e.target.value.replace(/[^0-9]/g, ''); setForm({ ...form, price_per_session: d ? parseInt(d, 10) * 100 : 0 }); }} />
         </label>
         <label className="auth-label">Duration (minutes)
-          <input className="auth-input" type="number" min={15} value={form.duration_minutes} onChange={(e) => setForm({ ...form, duration_minutes: Number(e.target.value) })} />
+          <input className="auth-input" inputMode="numeric" value={form.duration_minutes ? String(form.duration_minutes) : ''} onChange={(e) => { const d = e.target.value.replace(/[^0-9]/g, ''); setForm({ ...form, duration_minutes: d ? parseInt(d, 10) : 0 }); }} />
         </label>
       </div>
       <label className="auth-label">Description

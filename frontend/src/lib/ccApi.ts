@@ -52,7 +52,7 @@ export interface VenueListing {
   id: number; venue_id: number;
   category: Category;
   title: string; description: string; rules: string;
-  capacity: number; price_per_hour: number; price_per_session: number;
+  capacity: string; price_per_hour: number; price_per_session: number;
   duration_minutes: number; is_bookable: boolean; is_tournament_eligible: boolean;
   is_active: boolean;
   photos: VenuePhoto[];

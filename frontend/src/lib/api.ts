@@ -61,6 +61,7 @@ export interface UserRead {
   is_admin: boolean;
   is_verified: boolean;
   is_venue_owner: boolean;
+  is_match_admin?: boolean;
   created_at: string;
   profile_edit_date: string;
   profile_edits_today: number;

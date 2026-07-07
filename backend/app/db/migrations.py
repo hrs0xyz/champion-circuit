@@ -10,9 +10,39 @@ def _add_column(connection, table: str, column: str, definition: str) -> None:
     connection.execute(text(f"ALTER TABLE {table} ADD COLUMN {column} {definition}"))
 
 
+def _ensure_postgres_schema() -> None:
+    """
+    Lightweight idempotent migrations for Postgres (this project doesn't use
+    Alembic). Safe to run on every startup.
+    """
+    inspector = inspect(engine)
+    tables = inspector.get_table_names()
+    with engine.begin() as conn:
+        # listings.capacity: int -> varchar (now stores "10" or a range "5-10")
+        if "listings" in tables:
+            col = next(
+                (c for c in inspector.get_columns("listings") if c["name"] == "capacity"),
+                None,
+            )
+            if col is not None and "int" in str(col["type"]).lower():
+                conn.execute(text(
+                    "ALTER TABLE listings ALTER COLUMN capacity "
+                    "TYPE VARCHAR(20) USING capacity::varchar"
+                ))
+                conn.execute(text(
+                    "ALTER TABLE listings ALTER COLUMN capacity SET DEFAULT ''"
+                ))
+                conn.execute(text(
+                    "UPDATE listings SET capacity = '' WHERE capacity IS NULL OR capacity = '0'"
+                ))
+
+
 def ensure_dev_schema() -> None:
+    if engine.url.drivername.startswith("postgresql"):
+        _ensure_postgres_schema()
+        return
     if not engine.url.drivername.startswith("sqlite"):
-        return  # RDS / Postgres uses Alembic
+        return
 
     inspector = inspect(engine)
     tables = inspector.get_table_names()

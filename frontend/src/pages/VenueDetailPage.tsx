@@ -100,7 +100,7 @@ export function ListingDetailModal({
           <p className="listing-modal__venue muted small">📍 {venueName}</p>
 
           <div className="listing-modal__meta">
-            {l.capacity > 0 && <span className="listing-card__detail">👥 {l.capacity} max</span>}
+            {l.capacity && <span className="listing-card__detail">👥 {l.capacity} players</span>}
             {l.duration_minutes > 0 && <span className="listing-card__detail">⏱ {l.duration_minutes} min</span>}
             <span className="listing-modal__price">{priceLabel(l)}</span>
           </div>
@@ -608,10 +608,13 @@ export function VenueDetailPage() {
                   {venue.is_verified && <span className="venue-verified-badge">✓ Verified</span>}
                 </div>
                 <p className="vdp__location">
-                  📍 {[venue.address_line1, venue.city, venue.state].filter(Boolean).join(', ')}
+                  📍 {[venue.address_line1, venue.address_line2, venue.city, venue.state].filter(Boolean).join(', ')}
                 </p>
                 {venue.phone && (
                   <a href={`tel:${venue.phone}`} className="vdp__phone">📞 {venue.phone}</a>
+                )}
+                {venue.website && (
+                  <a href={venue.website} target="_blank" rel="noreferrer" className="vdp__phone">🌐 {venue.website.replace(/^https?:\/\//, '')}</a>
                 )}
               </div>
             </div>
@@ -726,8 +729,8 @@ export function VenueDetailPage() {
                         )}
 
                         <div className="listing-card__details">
-                          {l.capacity > 0 && (
-                            <span className="listing-card__detail">👥 {l.capacity} max</span>
+                          {l.capacity && (
+                            <span className="listing-card__detail">👥 {l.capacity} players</span>
                           )}
                           {l.duration_minutes > 0 && (
                             <span className="listing-card__detail">⏱ {l.duration_minutes} min</span>
@@ -827,17 +830,24 @@ export function VenueDetailPage() {
             )}
             {venue.address_line1 && (
               <p className="vdp__sidebar-address">
-                {[venue.address_line1, venue.city, venue.state].filter(Boolean).join(', ')}
+                {[venue.address_line1, venue.address_line2, venue.city, venue.state].filter(Boolean).join(', ')}
               </p>
             )}
           </div>
 
-          {venue.phone && (
+          {(venue.phone || venue.website) && (
             <div className="vdp__sidebar-card">
               <h3 className="vdp__sidebar-title">Contact</h3>
-              <a href={`tel:${venue.phone}`} className="vdp__sidebar-phone">
-                📞 {venue.phone}
-              </a>
+              {venue.phone && (
+                <a href={`tel:${venue.phone}`} className="vdp__sidebar-phone">
+                  📞 {venue.phone}
+                </a>
+              )}
+              {venue.website && (
+                <a href={venue.website} target="_blank" rel="noreferrer" className="vdp__sidebar-phone" style={{ display: 'block', marginTop: venue.phone ? 8 : 0 }}>
+                  🌐 {venue.website.replace(/^https?:\/\//, '')}
+                </a>
+              )}
               <button
                 type="button"
                 className="btn btn-primary"
