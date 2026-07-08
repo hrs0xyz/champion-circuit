@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session, joinedload, selectinload
 from app.models.user import User
 from app.models.venue import (
     Booking, Listing, ListingAmenity, ListingCategory,
-    ListingPhoto, ListingSlot, Venue, VenueAdmin,
+    ListingPhoto, ListingSlot, Venue, VenueAdmin, VenueCoverPhoto,
 )
 from app.schemas.venue import (
     BookingCreate, ListingCreate, ListingUpdate, SlotCreate, VenueCreate, VenueUpdate,
@@ -69,14 +69,21 @@ def create_venue(db: Session, payload: VenueCreate, owner_user_id: int) -> Venue
 def get_venue(db: Session, venue_id: int) -> Venue | None:
     return (
         db.query(Venue)
-        .options(joinedload(Venue.listings).joinedload(Listing.photos))
+        .options(
+            joinedload(Venue.listings).joinedload(Listing.photos),
+            joinedload(Venue.cover_photos),
+        )
         .filter(Venue.id == venue_id)
         .first()
     )
 
 
 def list_venues(db: Session, city: str = "", skip: int = 0, limit: int = 40) -> list[Venue]:
-    q = db.query(Venue).filter(Venue.is_active == True)  # noqa: E712
+    q = (
+        db.query(Venue)
+        .options(joinedload(Venue.cover_photos))
+        .filter(Venue.is_active == True)  # noqa: E712
+    )
     if city:
         q = q.filter(Venue.city.ilike(f"%{city}%"))
     return q.order_by(Venue.is_verified.desc(), Venue.name).offset(skip).limit(limit).all()
@@ -95,12 +102,18 @@ def update_venue(db: Session, venue: Venue, payload: VenueUpdate) -> Venue:
 
 
 def get_user_venue(db: Session, user_id: int, include_inactive: bool = False) -> Venue | None:
-    """Return the venue owned by this user, if any.
-
-    By default only active venues are returned. Pass include_inactive=True for
-    owner-facing flows (the owner must still see / not duplicate a suspended venue).
-    """
-    q = db.query(Venue).filter(Venue.owner_user_id == user_id)
+    """Return the venue owned by this user, if any."""
+    q = (
+        db.query(Venue)
+        .options(
+            joinedload(Venue.cover_photos),
+            joinedload(Venue.listings).joinedload(Listing.photos),
+            joinedload(Venue.listings).joinedload(Listing.amenities),
+            joinedload(Venue.listings).joinedload(Listing.slots),
+            joinedload(Venue.listings).joinedload(Listing.category),
+        )
+        .filter(Venue.owner_user_id == user_id)
+    )
     if not include_inactive:
         q = q.filter(Venue.is_active == True)  # noqa: E712
     return q.first()
@@ -337,6 +350,10 @@ def serialize_venue(venue: Venue) -> dict:
         "description": venue.description,
         "logo_url": venue.logo_url,
         "cover_url": venue.cover_url,
+        "cover_photos": [
+            {"id": p.id, "url": p.url, "sort_order": p.sort_order}
+            for p in (venue.cover_photos or [])
+        ],
         "phone": venue.phone,
         "email": venue.email,
         "website": venue.website,
@@ -350,3 +367,34 @@ def serialize_venue(venue: Venue) -> dict:
         "is_verified": venue.is_verified,
         "is_active": venue.is_active,
     }
+
+
+# ── Venue images ──────────────────────────────────────────────────────────────
+
+def set_venue_logo_url(db: Session, venue: Venue, url: str) -> Venue:
+    venue.logo_url = url
+    db.commit()
+    db.refresh(venue)
+    return venue
+
+
+def add_venue_cover_photo(db: Session, venue_id: int, url: str) -> VenueCoverPhoto:
+    count = db.query(VenueCoverPhoto).filter(VenueCoverPhoto.venue_id == venue_id).count()
+    if count >= 3:
+        raise ValueError("Maximum 3 cover photos per venue")
+    photo = VenueCoverPhoto(venue_id=venue_id, url=url, sort_order=count + 1)
+    db.add(photo)
+    db.commit()
+    db.refresh(photo)
+    return photo
+
+
+def delete_venue_cover_photo(db: Session, photo_id: int, venue_id: int) -> bool:
+    photo = db.query(VenueCoverPhoto).filter(
+        VenueCoverPhoto.id == photo_id, VenueCoverPhoto.venue_id == venue_id
+    ).first()
+    if not photo:
+        return False
+    db.delete(photo)
+    db.commit()
+    return True

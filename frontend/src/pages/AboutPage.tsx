@@ -9,8 +9,8 @@ export function AboutPage() {
           <div className="section-head">
             <h1>About Champion Circuit</h1>
             <p>
-              Champion Circuit is India&apos;s first integrated youth sports and gaming ecosystem: one hub where urban
-              players book maintained turfs, compete in offline and online esports, recover in wellness facilities, and
+              Champion Circuit is India&apos;s first integrated youth sports and gaming ecosystem: one hub where
+              Players book maintained turfs, compete in offline and online esports, recover in wellness facilities, and
               build toward AI-backed performance tracking.
             </p>
           </div>

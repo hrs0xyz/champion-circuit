@@ -12,7 +12,9 @@ function ArticleCard({ a }: { a: NewsArticle }) {
           <img src={a.cover_url} alt={a.title} className="news-card__img" />
         </div>
       ) : (
-        <div className="news-card__img-placeholder">📰</div>
+        <div className="news-card__img-placeholder">
+          <img src="/branding/cc-mark.png" alt="Champion Circuit" className="news-card__img-placeholder-logo" />
+        </div>
       )}
       <div className="news-card__body">
         <span className={`news-card__cat news-card__cat--${a.category}`}>{a.category}</span>

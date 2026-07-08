@@ -37,6 +37,8 @@ export interface Category {
   id: number; slug: string; name: string; type: string; icon_url: string;
 }
 
+export interface VenueCoverPhoto { id: number; url: string; sort_order: number; }
+
 export interface VenuePhoto { id: number; url: string; caption: string; sort_order: number; }
 
 export interface ListingSlot {
@@ -63,6 +65,7 @@ export interface VenueListing {
 export interface Venue {
   id: number; name: string; slug: string;
   description: string; logo_url: string; cover_url: string;
+  cover_photos: VenueCoverPhoto[];
   phone: string; email: string; website: string;
   address_line1: string; address_line2?: string;
   city: string; state: string; postal_code: string;
@@ -260,6 +263,20 @@ export const ccApi = {
   myTeams: () => req<Team[]>('/api/teams/me'),
   inviteToTeam: (teamId: number, email: string) =>
     req<object>(`/api/teams/${teamId}/invite?email=${encodeURIComponent(email)}`, { method: 'POST' }),
+
+  // Venue images
+  uploadVenueLogo: (file: File) => {
+    const form = new FormData();
+    form.append('file', file);
+    return req<{ url: string }>('/api/uploads/venue-logo', { method: 'POST', body: form });
+  },
+  uploadVenueCover: (file: File) => {
+    const form = new FormData();
+    form.append('file', file);
+    return req<VenueCoverPhoto>('/api/uploads/venue-cover', { method: 'POST', body: form });
+  },
+  deleteVenueCoverPhoto: (venueId: number, photoId: number) =>
+    req<{ message: string }>(`/api/venues/${venueId}/cover-photos/${photoId}`, { method: 'DELETE' }),
 
   // News
   news: (category = '') =>

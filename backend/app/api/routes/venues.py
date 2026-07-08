@@ -47,11 +47,13 @@ from app.schemas.venue import (
 from app.services.venue import (
     add_listing_photo,
     add_slot,
+    add_venue_cover_photo,
     create_booking,
     create_listing,
     create_venue,
     delete_listing_photo,
     delete_slot,
+    delete_venue_cover_photo,
     SlotInUseError,
     get_all_categories,
     get_booking,
@@ -66,6 +68,7 @@ from app.services.venue import (
     serialize_listing,
     serialize_venue,
     set_amenities,
+    set_venue_logo_url,
     update_booking_status,
     update_listing,
     update_venue,
@@ -344,6 +347,23 @@ def set_booking_status(
         "end_time": booking.end_time, "status": booking.status,
         "num_players": booking.num_players, "user_id": booking.user_id,
     }
+
+
+@router.delete("/venues/{venue_id}/cover-photos/{photo_id}")
+def remove_venue_cover_photo(
+    venue_id: int,
+    photo_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    v = get_venue(db, venue_id)
+    if not v:
+        raise HTTPException(status_code=404, detail="Venue not found")
+    if not current_user.is_admin and not is_venue_staff(db, venue_id, current_user.id):
+        raise HTTPException(status_code=403, detail="Not authorised")
+    if not delete_venue_cover_photo(db, photo_id, venue_id):
+        raise HTTPException(status_code=404, detail="Photo not found")
+    return {"message": "Deleted"}
 
 
 # ── Bookings (user) ───────────────────────────────────────────────────────────

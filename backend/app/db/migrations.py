@@ -18,6 +18,19 @@ def _ensure_postgres_schema() -> None:
     inspector = inspect(engine)
     tables = inspector.get_table_names()
     with engine.begin() as conn:
+        # venue_cover_photos table
+        if "venue_cover_photos" not in tables:
+            conn.execute(text("""
+                CREATE TABLE venue_cover_photos (
+                    id          SERIAL PRIMARY KEY,
+                    venue_id    INTEGER NOT NULL REFERENCES venues(id) ON DELETE CASCADE,
+                    url         VARCHAR(500) NOT NULL,
+                    sort_order  INTEGER DEFAULT 1 NOT NULL,
+                    uploaded_at TIMESTAMPTZ DEFAULT NOW()
+                )
+            """))
+            conn.execute(text("CREATE INDEX ix_venue_cover_photos_venue_id ON venue_cover_photos(venue_id)"))
+
         # listings.capacity: int -> varchar (now stores "10" or a range "5-10")
         if "listings" in tables:
             col = next(
@@ -35,6 +48,50 @@ def _ensure_postgres_schema() -> None:
                 conn.execute(text(
                     "UPDATE listings SET capacity = '' WHERE capacity IS NULL OR capacity = '0'"
                 ))
+
+        # news_articles.body / cover_url / tags / published_at / summary:
+        # were created as VARCHAR(30) from an old model; must be TEXT / larger VARCHAR.
+        if "news_articles" in tables:
+            for col_name, new_type, cast in [
+                ("body",         "TEXT",         "body::text"),
+                ("cover_url",    "VARCHAR(500)",  "cover_url::varchar"),
+                ("summary",      "VARCHAR(500)",  "summary::varchar"),
+                ("tags",         "VARCHAR(300)",  "tags::varchar"),
+                ("published_at", "VARCHAR(50)",   "published_at::varchar"),
+                ("slug",         "VARCHAR(160)",  "slug::varchar"),
+                ("category",     "VARCHAR(40)",   "category::varchar"),
+            ]:
+                col_info = next(
+                    (c for c in inspector.get_columns("news_articles") if c["name"] == col_name),
+                    None,
+                )
+                if col_info is None:
+                    continue
+                col_type_str = str(col_info["type"]).upper()
+                # Check if it's too small (VARCHAR with length <= 30 or < target)
+                needs_upgrade = False
+                if "TEXT" in col_type_str and new_type == "TEXT":
+                    needs_upgrade = False  # already TEXT
+                elif "CHARACTER VARYING" in col_type_str or "VARCHAR" in col_type_str:
+                    try:
+                        current_len = int(str(col_info["type"]).split("(")[1].rstrip(")"))
+                        target_len = int(new_type.split("(")[1].rstrip(")")) if "(" in new_type else 999999
+                        needs_upgrade = current_len < target_len
+                    except (IndexError, ValueError):
+                        needs_upgrade = True
+                elif col_type_str == "TEXT":
+                    needs_upgrade = False
+                else:
+                    needs_upgrade = True
+
+                if new_type == "TEXT" and "TEXT" not in col_type_str:
+                    needs_upgrade = True
+
+                if needs_upgrade:
+                    conn.execute(text(
+                        f"ALTER TABLE news_articles ALTER COLUMN {col_name} "
+                        f"TYPE {new_type} USING {cast}"
+                    ))
 
 
 def ensure_dev_schema() -> None:
@@ -132,3 +189,16 @@ def ensure_dev_schema() -> None:
             conn.execute(text("CREATE INDEX ix_activity_event ON user_activity(event)"))
             conn.execute(text("CREATE INDEX ix_activity_venue_id ON user_activity(venue_id)"))
             conn.execute(text("CREATE INDEX ix_activity_created_at ON user_activity(created_at)"))
+
+        # ── venue_cover_photos ─────────────────────────────────────────────────
+        if "venue_cover_photos" not in tables:
+            conn.execute(text("""
+                CREATE TABLE venue_cover_photos (
+                    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+                    venue_id    INTEGER NOT NULL REFERENCES venues(id) ON DELETE CASCADE,
+                    url         VARCHAR(500) NOT NULL,
+                    sort_order  INTEGER DEFAULT 1 NOT NULL,
+                    uploaded_at DATETIME DEFAULT CURRENT_TIMESTAMP
+                )
+            """))
+            conn.execute(text("CREATE INDEX ix_venue_cover_photos_venue_id ON venue_cover_photos(venue_id)"))

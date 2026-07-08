@@ -1,16 +1,27 @@
 import { motion } from 'framer-motion';
 
-const PARTNERS = ['IIM Calcutta', 'IIT (BHU) Varanasi'] as const;
+const PARTNERS = [
+  { name: 'IIM Calcutta',       logo: '/branding/IIMcalcuta.png' },
+  { name: 'IIT (BHU) Varanasi', logo: '/branding/IITbhu.png'    },
+] as const;
 
-function PartnerMarqueeTrack({ ariaHidden = false }: { ariaHidden?: boolean }) {
+function MarqueeTrack({ ariaHidden = false }: { ariaHidden?: boolean }) {
+  const items = [...PARTNERS, ...PARTNERS, ...PARTNERS, ...PARTNERS];
   return (
     <div className="partner-marquee__track" aria-hidden={ariaHidden || undefined}>
-      {[...PARTNERS, ...PARTNERS, ...PARTNERS].map((name, i) => (
-        <span key={`${name}-${i}`} className="partner-marquee__item">
-          {name}
-          <span className="partner-marquee__sep" aria-hidden>
-            ·
-          </span>
+      {items.map((p, i) => (
+        <span key={`${p.name}-${i}`} className="partner-marquee__item">
+          <img
+            src={p.logo}
+            alt={p.name}
+            className="partner-marquee__logo"
+            width={48}
+            height={48}
+            loading="lazy"
+            decoding="async"
+          />
+          {p.name}
+          <span className="partner-marquee__sep" aria-hidden>·</span>
         </span>
       ))}
     </div>
@@ -32,17 +43,18 @@ export function ClientsSection() {
         <header className="lp-section__head">
           <span className="lp-kicker">// Backed by</span>
           <h2 id="clients-title" className="lp-section__title">
-            Brands &amp; <span className="lp-grad">partners</span>
+            Brands &amp; <span className="lp-grad">Partners</span>
           </h2>
           <p className="lp-section__lead">
             Backed by leading institutions shaping India&apos;s next generation of sport and gaming talent.
           </p>
         </header>
+
         <div className="partner-marquee" role="region" aria-label="University partners">
           <div className="partner-marquee__viewport">
             <div className="partner-marquee__inner">
-              <PartnerMarqueeTrack />
-              <PartnerMarqueeTrack ariaHidden />
+              <MarqueeTrack />
+              <MarqueeTrack ariaHidden />
             </div>
           </div>
         </div>

@@ -5,6 +5,7 @@ Tables:
   listing_categories  — seed data (Cricket, Badminton, Valorant …)
   venues              — business accounts (turf, gaming club, café)
   venue_admins        — staff attached to a venue
+  venue_cover_photos  — up to 3 cover images per venue
   listings            — one activity per listing (Cricket Turf A, PS5 Pod)
   listing_photos      — up to 5 photos per listing
   listing_amenities   — tags like Floodlit, AC, WiFi
@@ -74,6 +75,28 @@ class Venue(Base):
 
     listings: Mapped[list["Listing"]] = relationship("Listing", back_populates="venue")
     admins: Mapped[list["VenueAdmin"]] = relationship("VenueAdmin", back_populates="venue")
+    cover_photos: Mapped[list["VenueCoverPhoto"]] = relationship(
+        "VenueCoverPhoto", back_populates="venue",
+        order_by="VenueCoverPhoto.sort_order", cascade="all, delete-orphan"
+    )
+
+
+# ── Venue cover photos (max 3) ────────────────────────────────────────────────
+
+class VenueCoverPhoto(Base):
+    __tablename__ = "venue_cover_photos"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    venue_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("venues.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    url: Mapped[str] = mapped_column(String(500), nullable=False)
+    sort_order: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
+    uploaded_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    venue: Mapped["Venue"] = relationship("Venue", back_populates="cover_photos")
 
 
 # ── Venue staff ───────────────────────────────────────────────────────────────

@@ -207,8 +207,11 @@ export function TurfBrowsePage() {
 function VenueCard({ venue: v, selectedSport, listings, onSelect }: {
   venue: Venue; selectedSport: string; listings: VenueListing[]; onSelect: () => void;
 }) {
-  // Use venue cover if available, otherwise use sport-specific image
-  const src = v.cover_url
+  // Use first cover_photo if available, then fall back to cover_url, then sport image
+  const coverPhotos = v.cover_photos ?? [];
+  const src = coverPhotos.length > 0
+    ? coverPhotos[0].url
+    : v.cover_url
     ? imgSrc(v.cover_url)
     : selectedSport !== 'all'
     ? SPORT_COVER_IMAGES[selectedSport] ?? SPORT_COVER_IMAGES.default

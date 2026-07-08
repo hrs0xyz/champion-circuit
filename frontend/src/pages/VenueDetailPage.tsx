@@ -166,58 +166,72 @@ function VenuePhotoGallery({
   sportParam: string;
 }) {
   const [lightboxIdx, setLightboxIdx] = useState<number | null>(null);
+  const [thumbRotateIdx, setThumbRotateIdx] = useState(0);
 
-  // Collect all photos: cover first, then listing photos
+  // Build photo list: cover_photos first, then listing photos filtered by sport
   const photos: { src: string; alt: string }[] = [];
 
-  // Use cover if available, otherwise use sport-specific image as hero
-  if (venue.cover_url) {
+  const coverPhotos = venue.cover_photos ?? [];
+  if (coverPhotos.length > 0) {
+    coverPhotos.forEach((p) => photos.push({ src: p.url, alt: venue.name }));
+  } else if (venue.cover_url) {
     photos.push({ src: imgSrc(venue.cover_url), alt: venue.name });
-  } else {
-    // Use sport param or first listing's category to pick hero image
-    const heroSport = sportParam || listings[0]?.category?.slug || 'default';
-    photos.push({
-      src: SPORT_COVER_IMAGES[heroSport] ?? SPORT_COVER_IMAGES.default,
-      alt: venue.name,
-    });
   }
 
-  // Add listing photos (unique, up to 4 more)
-  const seen = new Set<string>();
-  listings.forEach((l) => {
+  // Add listing photos — when sport filter active, only that sport's photos
+  const seen = new Set<string>(photos.map((p) => p.src));
+  const relevantListings = sportParam
+    ? listings.filter((l) => l.category.slug === sportParam)
+    : listings;
+  relevantListings.forEach((l) => {
     l.photos.forEach((p) => {
       const src = imgSrc(p.url);
-      if (!seen.has(src) && photos.length < 5) {
+      if (!seen.has(src)) {
         seen.add(src);
         photos.push({ src, alt: l.title });
       }
     });
   });
 
-  // Fill remaining slots with sport-specific images if < 5 total
-  if (photos.length < 5) {
-    const extras = [
-      SPORT_COVER_IMAGES[sportParam || listings[0]?.category?.slug || 'default'] ?? SPORT_COVER_IMAGES.default,
-      'https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=800&q=80',
-      'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=800&q=80',
-      'https://images.unsplash.com/photo-1504450758481-7338eba7524a?w=800&q=80',
-    ];
-    for (const src of extras) {
-      if (photos.length >= 5) break;
-      if (!photos.some((p) => p.src === src)) {
-        photos.push({ src, alt: `${venue.name} facility` });
-      }
-    }
+  // Only use sport fallback if there are ZERO real photos at all
+  if (photos.length === 0) {
+    // no real photos uploaded — show nothing (gallery won't render)
   }
 
   const mainPhoto = photos[0];
-  const thumbPhotos = photos.slice(1, 5);
+  // Extra photos beyond the first 4 thumbs rotate in the last thumb slot
+  const staticThumbs = photos.slice(1, 4);         // positions 1-3 fixed
+  const rotatingPool = photos.slice(4);             // position 4+ rotate
+
+  // Auto-rotate only the last thumb slot every 3s if there are extra photos
+  useEffect(() => {
+    if (rotatingPool.length === 0) return;
+    setThumbRotateIdx(0); // reset when pool changes (sport filter change)
+    const t = setInterval(() => setThumbRotateIdx((i) => (i + 1) % rotatingPool.length), 3000);
+    return () => clearInterval(t);
+  }, [rotatingPool.length, sportParam]);
+
+  // Build 4 thumb slots
+  const thumbSlots: { src: string; alt: string; photoIdx: number }[] = staticThumbs.map((p, i) => ({
+    ...p, photoIdx: i + 1,
+  }));
+  if (rotatingPool.length > 0) {
+    thumbSlots.push({
+      src: rotatingPool[thumbRotateIdx].src,
+      alt: rotatingPool[thumbRotateIdx].alt,
+      photoIdx: 4 + thumbRotateIdx,
+    });
+  }
+
   const totalCount = photos.length;
+
+  // Don't render gallery if no real photos
+  if (photos.length === 0) return null;
 
   return (
     <>
       <div className="vdp-gallery">
-        {/* Main large image */}
+        {/* Main large image — fixed, no auto-rotate */}
         <button
           className="vdp-gallery__main"
           type="button"
@@ -227,32 +241,33 @@ function VenuePhotoGallery({
           <img src={mainPhoto.src} alt={mainPhoto.alt} loading="eager" />
         </button>
 
-        {/* Thumbnail grid */}
-        <div className="vdp-gallery__thumbs">
-          {thumbPhotos.map((p, i) => (
-            <button
-              key={i}
-              className="vdp-gallery__thumb"
-              type="button"
-              onClick={() => setLightboxIdx(i + 1)}
-              aria-label={`View photo ${i + 2}`}
-            >
-              <img src={p.src} alt={p.alt} loading="lazy" />
-              {i === 3 && totalCount > 5 && (
-                <div className="vdp-gallery__more-overlay">+{totalCount - 5} more</div>
-              )}
-            </button>
-          ))}
-        </div>
+        {/* Thumbnail grid — only shows if there are real thumb photos */}
+        {thumbSlots.length > 0 && (
+          <div
+            className="vdp-gallery__thumbs"
+            data-count={thumbSlots.length}
+          >
+            {thumbSlots.map((p, i) => (
+              <button
+                key={i}
+                className="vdp-gallery__thumb"
+                type="button"
+                style={thumbSlots.length === 3 && i === 2 ? { gridColumn: '1 / -1' } : undefined}
+                onClick={() => setLightboxIdx(p.photoIdx)}
+                aria-label={`View photo ${p.photoIdx + 1}`}
+              >
+                <img src={p.src} alt={p.alt} loading="lazy" />
+                {i === thumbSlots.length - 1 && totalCount > 5 && (
+                  <div className="vdp-gallery__more-overlay">+{totalCount - 5} more</div>
+                )}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
-      {/* Lightbox */}
       {lightboxIdx !== null && (
-        <PhotoLightbox
-          photos={photos}
-          startIdx={lightboxIdx}
-          onClose={() => setLightboxIdx(null)}
-        />
+        <PhotoLightbox photos={photos} startIdx={lightboxIdx} onClose={() => setLightboxIdx(null)} />
       )}
     </>
   );
@@ -470,6 +485,169 @@ export function ReviewsSection({ venueId }: { venueId: number }) {
   );
 }
 
+// ── ListingCard with auto-rotating photos ────────────────────────────────────
+
+function ListingCard({ listing: l, venue, expandedListing, setExpandedListing, user, navigate, setShowInquiry, track }: {
+  listing: VenueListing;
+  venue: Venue;
+  expandedListing: number | null;
+  setExpandedListing: (id: number | null) => void;
+  user: { name?: string } | null;
+  navigate: (path: string) => void;
+  setShowInquiry: (v: boolean) => void;
+  track: (data: object) => void;
+}) {
+  const allPhotos = l.photos.length > 0
+    ? l.photos.map((p) => imgSrc(p.url))
+    : [SPORT_COVER_IMAGES[l.category.slug] ?? SPORT_COVER_IMAGES.default];
+
+  const [idx, setIdx] = useState(0);
+
+  // Auto-rotate every 3 seconds if multiple photos
+  useEffect(() => {
+    if (allPhotos.length <= 1) return;
+    const timer = setInterval(() => {
+      setIdx((i) => (i + 1) % allPhotos.length);
+    }, 3000);
+    return () => clearInterval(timer);
+  }, [allPhotos.length]);
+
+  return (
+    <div
+      className="listing-card listing-card--clickable"
+      role="button"
+      tabIndex={0}
+      onClick={() => {
+        track({
+          event: 'listing_inquiry',
+          venue_id: venue.id,
+          venue_name: venue.name,
+          sport: l.category.slug,
+          listing_id: l.id,
+          listing_title: l.title,
+        });
+        setExpandedListing(expandedListing === l.id ? null : l.id);
+      }}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          setExpandedListing(expandedListing === l.id ? null : l.id);
+        }
+      }}
+    >
+      {/* Photo with auto-rotate */}
+      <div className="listing-card__photos">
+        <img
+          src={allPhotos[idx]}
+          alt={l.title}
+          className="listing-card__photo"
+          loading="lazy"
+        />
+        {allPhotos.length > 1 && (
+          <div className="listing-card__photo-dots">
+            {allPhotos.map((_, i) => (
+              <button
+                key={i}
+                type="button"
+                className={`photo-dot${i === idx ? ' photo-dot--active' : ''}`}
+                onClick={(e) => { e.stopPropagation(); setIdx(i); }}
+                aria-label={`Photo ${i + 1}`}
+              />
+            ))}
+          </div>
+        )}
+        <span className={`listing-card__type listing-card__type--${l.category.type}`}>
+          {l.category.name}
+        </span>
+      </div>
+
+      <div className="listing-card__body">
+        <h3 className="listing-card__title">{l.title}</h3>
+        {l.description && <p className="listing-card__desc">{l.description}</p>}
+        <div className="listing-card__details">
+          {l.capacity && <span className="listing-card__detail">👥 {l.capacity} players</span>}
+          {l.duration_minutes > 0 && <span className="listing-card__detail">⏱ {l.duration_minutes} min</span>}
+        </div>
+        {l.amenities.length > 0 && (
+          <div className="listing-card__amenities">
+            {l.amenities.map((a) => <span key={a} className="listing-card__amenity">{a}</span>)}
+          </div>
+        )}
+        <div className="listing-card__footer">
+          <span className="listing-card__price">{priceLabel(l)}</span>
+          <span className="listing-card__expand-hint muted small">
+            {expandedListing === l.id ? '▲ Less' : '▼ More'}
+          </span>
+        </div>
+      </div>
+
+      {/* Expanded detail panel */}
+      {expandedListing === l.id && (
+        <div className="listing-card__expanded" onClick={(e) => e.stopPropagation()}>
+          <div className="listing-card__expanded-body">
+            {/* Slots */}
+            {l.slots && l.slots.filter((s) => !s.is_blocked).length > 0 && (
+              <div className="listing-expanded-section">
+                <p className="listing-expanded-label">Available Slots</p>
+                <div className="listing-slots-grid">
+                  {l.slots.filter((s) => !s.is_blocked).map((s) => (
+                    <div key={s.id} className="listing-slot-chip">
+                      <span className="listing-slot-chip__day">
+                        {s.day_of_week >= 0 ? ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'][s.day_of_week] : s.specific_date || 'Any'}
+                      </span>
+                      <span className="listing-slot-chip__time">{s.start_time} – {s.end_time}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            {l.rules && (
+              <div className="listing-expanded-section">
+                <p className="listing-expanded-label">Rules</p>
+                <p className="listing-expanded-text">{l.rules}</p>
+              </div>
+            )}
+            {/* Send Inquiry — big prominent CTA */}
+            <div className="listing-expanded-cta">
+              <button
+                type="button"
+                className="btn btn-primary"
+                style={{ flex: 1, fontSize: 16, padding: '12px 20px' }}
+                onClick={() => {
+                  if (!user) navigate(`/login?next=${encodeURIComponent(`/venue/${venue.id}`)}`);
+                  else setShowInquiry(true);
+                }}
+              >
+                📩 Send Inquiry
+              </button>
+              {venue.phone && (
+                <a
+                  href={`tel:${venue.phone}`}
+                  className="btn btn-secondary"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  📞 Call
+                </a>
+              )}
+              <button
+                type="button"
+                className="btn btn-ghost btn-sm"
+                style={{ whiteSpace: 'nowrap' }}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  navigate(`/venue/${venue.id}?sport=${l.category.slug}`);
+                }}
+              >
+                View →
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── VenueDetailPage ───────────────────────────────────────────────────────────
 
 export function VenueDetailPage() {
@@ -483,7 +661,6 @@ export function VenueDetailPage() {
   const [venue, setVenue] = useState<Venue | null>(null);
   const [listings, setListings] = useState<VenueListing[]>([]);
   const [loading, setLoading] = useState(true);
-  const [photoIdx, setPhotoIdx] = useState<Record<number, number>>({});
   const [filterSlug, setFilterSlug] = useState(sportParam || 'all');
   const [showInquiry, setShowInquiry] = useState(false);
   const [expandedListing, setExpandedListing] = useState<number | null>(null);
@@ -663,154 +840,19 @@ export function VenueDetailPage() {
               />
 
               <div className="listing-grid">
-                {displayedListings.map((l) => {
-                  const idx = photoIdx[l.id] ?? 0;
-                  const photo = l.photos[idx];
-                  const sportPhoto = SPORT_COVER_IMAGES[l.category.slug] ?? SPORT_COVER_IMAGES.default;
-                  const displayPhoto = l.photos.length > 0 ? imgSrc(photo?.url ?? '') : sportPhoto;
-
-                  return (
-                    <div
-                      key={l.id}
-                      className="listing-card listing-card--clickable"
-                      role="button"
-                      tabIndex={0}
-                      onClick={() => {
-                        track({
-                          event: 'listing_inquiry',
-                          venue_id: venue.id,
-                          venue_name: venue.name,
-                          sport: l.category.slug,
-                          listing_id: l.id,
-                          listing_title: l.title,
-                        });
-                        setExpandedListing(expandedListing === l.id ? null : l.id);
-                      }}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter' || e.key === ' ') {
-                          e.preventDefault();
-                          setExpandedListing(expandedListing === l.id ? null : l.id);
-                        }
-                      }}
-                    >
-                      {/* Photo — always shows, sport-specific fallback */}
-                      <div className="listing-card__photos">
-                        <img
-                          src={displayPhoto}
-                          alt={l.title}
-                          className="listing-card__photo"
-                          loading="lazy"
-                        />
-                        {l.photos.length > 1 && (
-                          <div className="listing-card__photo-dots">
-                            {l.photos.map((_, i) => (
-                              <button
-                                key={i}
-                                type="button"
-                                className={`photo-dot${i === idx ? ' photo-dot--active' : ''}`}
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setPhotoIdx((prev) => ({ ...prev, [l.id]: i }));
-                                }}
-                                aria-label={`Photo ${i + 1}`}
-                              />
-                            ))}
-                          </div>
-                        )}
-                        <span className={`listing-card__type listing-card__type--${l.category.type}`}>
-                          {l.category.name}
-                        </span>
-                      </div>
-
-                      <div className="listing-card__body">
-                        <h3 className="listing-card__title">{l.title}</h3>
-                        {l.description && (
-                          <p className="listing-card__desc">{l.description}</p>
-                        )}
-
-                        <div className="listing-card__details">
-                          {l.capacity && (
-                            <span className="listing-card__detail">👥 {l.capacity} players</span>
-                          )}
-                          {l.duration_minutes > 0 && (
-                            <span className="listing-card__detail">⏱ {l.duration_minutes} min</span>
-                          )}
-                        </div>
-
-                        {l.amenities.length > 0 && (
-                          <div className="listing-card__amenities">
-                            {l.amenities.map((a) => (
-                              <span key={a} className="listing-card__amenity">{a}</span>
-                            ))}
-                          </div>
-                        )}
-
-                        <div className="listing-card__footer">
-                          <span className="listing-card__price">{priceLabel(l)}</span>
-                          <span className="listing-card__expand-hint muted small">
-                            {expandedListing === l.id ? '▲ Less' : '▼ More'}
-                          </span>
-                        </div>
-                      </div>
-
-                      {/* Expanded detail panel */}
-                      {expandedListing === l.id && (
-                        <div
-                          className="listing-card__expanded"
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          <div className="listing-card__expanded-body">
-                            {l.rules && (
-                              <div className="listing-expanded-section">
-                                <p className="listing-expanded-label">Rules</p>
-                                <p className="listing-expanded-text">{l.rules}</p>
-                              </div>
-                            )}
-                            <div className="listing-expanded-section">
-                              <p className="listing-expanded-label">How to book</p>
-                              <p className="listing-expanded-text">
-                                Send an inquiry — we'll confirm availability and share booking details with you.
-                              </p>
-                            </div>
-                            <div className="listing-expanded-actions">
-                              <button
-                                type="button"
-                                className="btn btn-primary"
-                                style={{ flex: 1 }}
-                                onClick={() => {
-                                  if (!user) navigate(`/login?next=${encodeURIComponent(`/venue/${venue.id}`)}`);
-                                  else setShowInquiry(true);
-                                }}
-                              >
-                                📩 Send Inquiry
-                              </button>
-                              {venue.phone && (
-                                <a
-                                  href={`tel:${venue.phone}`}
-                                  className="btn btn-secondary"
-                                  onClick={(e) => e.stopPropagation()}
-                                >
-                                  📞 Call
-                                </a>
-                              )}
-                              <button
-                                type="button"
-                                className="btn btn-ghost btn-sm"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  window.scrollTo({ top: 0, behavior: 'smooth' });
-                                  navigate(`/venue/${venue.id}?sport=${l.category.slug}`);
-                                }}
-                              >
-                                View →
-                              </button>
-                            </div>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
+                {displayedListings.map((l) => (
+                  <ListingCard
+                    key={l.id}
+                    listing={l}
+                    venue={venue}
+                    expandedListing={expandedListing}
+                    setExpandedListing={setExpandedListing}
+                    user={user}
+                    navigate={navigate}
+                    setShowInquiry={setShowInquiry}
+                    track={track}
+                  />
+                ))}
               </div>
             </>
           )}

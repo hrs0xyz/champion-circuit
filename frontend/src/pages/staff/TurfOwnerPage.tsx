@@ -10,7 +10,7 @@ import { useAuth } from '../../context/AuthContext';
 import {
   ccApi, ApiError,
   type Category, type MyVenueData, type Tournament,
-  type Venue, type VenueListing,
+  type Venue, type VenueListing, type VenueCoverPhoto,
 } from '../../lib/ccApi';
 
 type Tab = 'overview' | 'venue' | 'listings' | 'bookings' | 'tournaments';
@@ -217,10 +217,122 @@ function VenueOverview({ venue, listings, bookings, goTo }: {
 const EMPTY_VENUE_FORM = {
   name: '', description: '', phone: '', email: '', website: '',
   address_line1: '', address_line2: '', city: '', state: '', postal_code: '',
-  logo_url: '', cover_url: '',
 };
 
 type VenueForm = typeof EMPTY_VENUE_FORM;
+
+// ── Venue image manager (logo + cover photos) ─────────────────────────────────
+
+function VenueImageManager({ venue, onMsg, onChanged }: {
+  venue: Venue;
+  onMsg: (m: string, kind?: 'ok' | 'err') => void;
+  onChanged: () => void;
+}) {
+  const [uploadingLogo, setUploadingLogo] = useState(false);
+  const [uploadingCover, setUploadingCover] = useState(false);
+
+  async function handleLogoUpload(e: ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    if (file.size > 3 * 1024 * 1024) { onMsg('Logo must be 3 MB or smaller.', 'err'); return; }
+    setUploadingLogo(true);
+    try {
+      await ccApi.uploadVenueLogo(file);
+      onMsg('Logo uploaded.');
+      onChanged();
+    } catch (err) {
+      onMsg(err instanceof ApiError ? err.message : 'Logo upload failed.', 'err');
+    } finally {
+      setUploadingLogo(false);
+    }
+  }
+
+  async function handleLogoRemove() {
+    try {
+      await ccApi.updateVenue(venue.id, { logo_url: '' });
+      onMsg('Logo removed.');
+      onChanged();
+    } catch (err) {
+      onMsg(err instanceof ApiError ? err.message : 'Remove failed.', 'err');
+    }
+  }
+
+  async function handleCoverUpload(e: ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    if (file.size > 3 * 1024 * 1024) { onMsg('Image must be 3 MB or smaller.', 'err'); return; }
+    setUploadingCover(true);
+    try {
+      await ccApi.uploadVenueCover(file);
+      onMsg('Cover photo uploaded.');
+      onChanged();
+    } catch (err) {
+      onMsg(err instanceof ApiError ? err.message : 'Cover upload failed.', 'err');
+    } finally {
+      setUploadingCover(false);
+    }
+  }
+
+  async function handleCoverRemove(photoId: number) {
+    try {
+      await ccApi.deleteVenueCoverPhoto(venue.id, photoId);
+      onMsg('Cover photo removed.');
+      onChanged();
+    } catch (err) {
+      onMsg(err instanceof ApiError ? err.message : 'Remove failed.', 'err');
+    }
+  }
+
+  const coverPhotos: VenueCoverPhoto[] = venue.cover_photos ?? [];
+
+  return (
+    <div className="staff-subsection" style={{ marginTop: 24 }}>
+      <h4 className="staff-subsection__title">Venue Images</h4>
+
+      {/* Logo */}
+      <div style={{ marginBottom: 20 }}>
+        <p className="auth-label" style={{ marginBottom: 8 }}>Logo <span className="muted">(optional, 1 image)</span></p>
+        {venue.logo_url ? (
+          <div className="staff-photo" style={{ width: 100, height: 100 }}>
+            <img src={venue.logo_url} alt="Venue logo" style={{ objectFit: 'contain', background: '#0a1628' }} />
+            <button type="button" className="staff-photo__del" title="Remove logo"
+              onClick={() => void handleLogoRemove()}>×</button>
+          </div>
+        ) : (
+          <label className={`staff-photo staff-photo--add${uploadingLogo ? ' staff-photo--busy' : ''}`}
+            style={{ width: 100, height: 100 }}>
+            <input type="file" accept="image/jpeg,image/png,image/webp" hidden
+              onChange={(e) => void handleLogoUpload(e)} disabled={uploadingLogo} />
+            {uploadingLogo ? 'Uploading…' : '+ Logo'}
+          </label>
+        )}
+      </div>
+
+      {/* Cover photos */}
+      <div>
+        <p className="auth-label" style={{ marginBottom: 8 }}>Cover photos <span className="muted">(0–3 images)</span></p>
+        <div className="staff-photo-grid">
+          {coverPhotos.map((p) => (
+            <div key={p.id} className="staff-photo">
+              <img src={p.url} alt="Cover" loading="lazy" />
+              <button type="button" className="staff-photo__del" title="Remove photo"
+                onClick={() => void handleCoverRemove(p.id)}>×</button>
+            </div>
+          ))}
+          {coverPhotos.length < 3 && (
+            <label className={`staff-photo staff-photo--add${uploadingCover ? ' staff-photo--busy' : ''}`}>
+              <input type="file" accept="image/jpeg,image/png,image/webp" hidden
+                onChange={(e) => void handleCoverUpload(e)} disabled={uploadingCover} />
+              {uploadingCover ? 'Uploading…' : '+ Add photo'}
+            </label>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
 
 function VenueEditor({ venue, onSaved, onMsg }: {
   venue: Venue | null;
@@ -237,7 +349,6 @@ function VenueEditor({ venue, onSaved, onMsg }: {
         phone: venue.phone ?? '', email: venue.email ?? '', website: venue.website ?? '',
         address_line1: venue.address_line1 ?? '', address_line2: venue.address_line2 ?? '',
         city: venue.city ?? '', state: venue.state ?? '', postal_code: venue.postal_code ?? '',
-        logo_url: venue.logo_url ?? '', cover_url: venue.cover_url ?? '',
       });
     }
   }, [venue]);
@@ -297,12 +408,6 @@ function VenueEditor({ venue, onSaved, onMsg }: {
           <label className="auth-label">Postal code
             <input className="auth-input" value={form.postal_code} onChange={set('postal_code')} />
           </label>
-          <label className="auth-label">Logo URL
-            <input className="auth-input" value={form.logo_url} onChange={set('logo_url')} placeholder="https://…/logo.png" />
-          </label>
-          <label className="auth-label">Cover image URL
-            <input className="auth-input" value={form.cover_url} onChange={set('cover_url')} placeholder="https://…/cover.jpg" />
-          </label>
         </div>
         <label className="auth-label">Description
           <textarea className="auth-input" rows={4} value={form.description} onChange={set('description')}
@@ -312,6 +417,11 @@ function VenueEditor({ venue, onSaved, onMsg }: {
           {saving ? 'Saving…' : venue ? 'Save changes' : 'Create venue'}
         </button>
       </form>
+
+      {/* Image manager shown only after venue exists */}
+      {venue && (
+        <VenueImageManager venue={venue} onMsg={onMsg} onChanged={onSaved} />
+      )}
     </div>
   );
 }

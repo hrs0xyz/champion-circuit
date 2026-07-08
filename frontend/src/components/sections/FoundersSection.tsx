@@ -12,13 +12,13 @@ const FOUNDERS = [
   {
     name: 'Priyanka Mondal',
     role: 'CDO, Co-Founder & Director',
-    note: 'Ex-Assistant Operation Manager at Lets Game Now. 5+ Years of experience in the esports Industry. Hosted Asian Games India Qualifier FIFA 2022 & eISL 2024.',
+    note: 'Ex-Assistant Operation Manager at Lets Game Now. 5+ Years of experience in the esports Industry. Hosted Asian Games India Qualifier 2022 (FIFA 22) & 2026 & eISL 2024.',
     photo: '/founders/priyanka-mondal.png',
   },
   {
     name: 'Sayantan Hait',
     role: 'CGO & Co-Founder',
-    note: 'Ex-eSports Manager at Lets Game Now. 7+ Years of experience in the eSports Industry. Hosted Asian Games India Qualifier FIFA 2022 & EISL 2024, GEG 2026 (League-Ops Head).',
+    note: 'Ex-eSports Manager at Lets Game Now. 7+ Years of experience in the eSports Industry. Hosted Asian Games India Qualifier 2022 (FIFA 22) & 2026 & eISL 2024, GEG 2026.',
     photo: '/founders/sayantan-hait.png',
   },
   {
@@ -30,7 +30,7 @@ const FOUNDERS = [
   {
     name: 'Saptarshee Ghosh',
     role: 'Head of Marketing',
-    note: '6+ years in Growth, Marketing & Creative Strategy. Worked with brands including Royal Enfield, Mumuso & Canon. Pinewood Studios Best Short Film Award recipient, featured in PCI. Hosted the G20 Summit in Sikkim.',
+    note: '6+ years in Growth, Marketing & Creative Strategy. Worked with renowned brands. Recognized by Pinewood Studios, featured in PCI.',
     photo: '/founders/Saptarshee_Ghosh.png',
   },
 ] as const;
@@ -86,7 +86,7 @@ export function FoundersSection() {
         <PageContainer>
           <div className="section-head section-head--center">
             <h2 id="advisors-title">Advisors</h2>
-            <p>Guided by leaders with deep industry expertise.</p>
+            <p>Guided by leader with deep industry expertise.</p>
           </div>
           <div className="cards founders-grid founders-grid--centered">
             {ADVISORS.map((a) => (

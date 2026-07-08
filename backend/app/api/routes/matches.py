@@ -336,6 +336,20 @@ def list_news_route(
     return [serialize_news(a) for a in articles]
 
 
+@router.get("/admin/news")
+def admin_list_news(
+    category: str = "",
+    skip: int = 0,
+    limit: int = 100,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Admin-only: returns all articles including drafts."""
+    _require_admin(current_user)
+    articles = list_news(db, category=category, published_only=False, skip=skip, limit=min(limit, 100))
+    return [serialize_news(a) for a in articles]
+
+
 @router.get("/news/{article_id}")
 def news_detail(article_id: int, db: Session = Depends(get_db)):
     article = get_news(db, article_id)
@@ -387,6 +401,21 @@ def publish_news_route(
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
     return serialize_news(article)
+
+
+@router.delete("/news/{article_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_news(
+    article_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    _require_admin(current_user)
+    from app.models.match import NewsArticle
+    article = db.get(NewsArticle, article_id)
+    if not article:
+        raise HTTPException(status_code=404, detail="Article not found")
+    db.delete(article)
+    db.commit()
 
 
 # ── Notifications ─────────────────────────────────────────────────────────────

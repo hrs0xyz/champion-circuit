@@ -173,7 +173,7 @@ class LeaderboardRow(BaseModel):
 class NewsCreate(BaseModel):
     title: str = Field(min_length=3, max_length=300)
     summary: str = Field(default="", max_length=500)
-    body: str = Field(default="", max_length=50000)
+    body: str = Field(default="", max_length=500000)   # up to 500k chars for long articles
     cover_url: str = Field(default="", max_length=500)
     category: str = Field(default="general", max_length=40)
     tags: str = Field(default="", max_length=300)
