@@ -1,8 +1,7 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { usePlatform } from '../context/PlatformContext';
 import { useAuth } from '../context/AuthContext';
-import { formatLabel, statusLabel } from '../lib/platformUtils';
+import { ApiError, ccApi, type Tournament } from '../lib/ccApi';
 import { PageContainer } from '../components/ui/PageContainer';
 import { Button } from '../components/ui/Button';
 import { EmptyState } from '../components/ui/EmptyState';
@@ -11,9 +10,29 @@ export function EsportsTournamentPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { tournaments, registerTournament, registered } = usePlatform();
+  const [t, setT] = useState<Tournament | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [registering, setRegistering] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
-  const t = tournaments.find((x) => x.id === id);
+
+  useEffect(() => {
+    if (!id) { setLoading(false); return; }
+    setLoading(true);
+    ccApi.tournament(Number(id))
+      .then(setT)
+      .catch(() => setT(null))
+      .finally(() => setLoading(false));
+  }, [id]);
+
+  if (loading) {
+    return (
+      <section className="section section-esports">
+        <PageContainer narrow>
+          <div className="tournament-card-skeleton" />
+        </PageContainer>
+      </section>
+    );
+  }
 
   if (!t) {
     return (
@@ -28,53 +47,61 @@ export function EsportsTournamentPage() {
     );
   }
 
-  const onRegister = () => {
+  const onRegister = async () => {
     if (!user) {
       navigate(`/login?next=${encodeURIComponent(`/esports/tournament/${t.id}`)}`);
       return;
     }
-    if (!registered) {
-      navigate(`/register?next=${encodeURIComponent(`/esports/tournament/${t.id}`)}`);
-      return;
+    setRegistering(true);
+    try {
+      await ccApi.registerTournament(t.id);
+      setMessage('Registration complete.');
+      const updated = await ccApi.tournament(t.id).catch(() => null);
+      if (updated) setT(updated);
+    } catch (err) {
+      setMessage(err instanceof ApiError ? err.message : 'Registration failed. Try again.');
+    } finally {
+      setRegistering(false);
     }
-    const err = registerTournament(t.id);
-    setMessage(err ?? 'Registration complete.');
   };
 
-  const canRegister = t.status === 'live' && t.registrationOpen;
-
   return (
-    <section className={`section section-esports${t.isExclusive ? ' esports-stage--exclusive' : ''}`}>
+    <section className={`section section-esports${t.is_exclusive ? ' esports-stage--exclusive' : ''}`}>
       <PageContainer>
         <Link className="muted small back-link" to="/esports">
           ← All tournaments
         </Link>
         <div className="tournament-detail__head">
-          <span className={`status-pill status-pill--${t.status}`}>{statusLabel(t.status)}</span>
-          {t.isExclusive ? <span className="status-pill status-pill--exclusive">Exclusive</span> : null}
+          <span className={`status-pill status-pill--${t.status}`}>{t.status.toUpperCase()}</span>
+          {t.is_exclusive ? <span className="status-pill status-pill--exclusive">Exclusive</span> : null}
         </div>
         <h1>{t.name}</h1>
         <p className="muted">
-          {t.game} · {formatLabel(t.format)} · {t.mode} · {t.date}
+          {t.game} · {t.format.replace(/_/g, ' ')} · {t.mode}
+          {t.starts_at ? ` · ${t.starts_at.slice(0, 10)}` : ''}
         </p>
         <p>{t.description}</p>
-        <h2>Rules</h2>
-        <p className="muted">{t.rules}</p>
+        {t.rules ? (
+          <>
+            <h2>Rules</h2>
+            <p className="muted">{t.rules}</p>
+          </>
+        ) : null}
+        {t.prize_description || t.prize_pool_paise > 0 ? (
+          <p className="muted">
+            🏆 {t.prize_description || `Prize pool: ₹${t.prize_pool_paise / 100}`}
+          </p>
+        ) : null}
         <p className="muted small">
-          {t.participants.length} / {t.participantsLimit} registered · {t.isPaid ? `INR ${t.entryFee}` : 'Free'}
+          {t.participant_count} / {t.max_participants} registered ·{' '}
+          {t.entry_fee_paise > 0 ? `₹${t.entry_fee_paise / 100} entry` : 'Free entry'}
         </p>
-        {canRegister ? (
-          <Button type="button" onClick={onRegister}>
-            Register for tournament
+        {t.registration_open ? (
+          <Button type="button" onClick={() => void onRegister()} disabled={registering}>
+            {registering ? 'Registering…' : 'Register for tournament'}
           </Button>
         ) : null}
         {message ? <p className="muted small">{message}</p> : null}
-        {t.winner ? (
-          <p className="muted">
-            Winner: {t.winner}
-            {t.secondPlace ? ` · Runner-up: ${t.secondPlace}` : ''}
-          </p>
-        ) : null}
         <Link className="btn btn-ghost" to="/leaderboard">
           View leaderboard
         </Link>

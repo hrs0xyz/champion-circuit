@@ -116,7 +116,9 @@ export function EsportsBrowsePage() {
                     <span className="tournament-card-new__game">{t.game}</span>
                   </div>
 
-                  <h3 className="tournament-card-new__name">{t.name}</h3>
+                  <h3 className="tournament-card-new__name">
+                    <Link to={`/esports/tournament/${t.id}`}>{t.name}</Link>
+                  </h3>
 
                   <div className="tournament-card-new__meta">
                     <span>🎮 {t.mode} · {t.format.replace('_', ' ')}</span>
