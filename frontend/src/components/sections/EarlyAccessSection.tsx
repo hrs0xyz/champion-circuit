@@ -110,8 +110,8 @@ export function EarlyAccessSection() {
         {/* Contact info — stacked, centered */}
         <div className="cta-contact">
           <p className="cta-contact__label">Get in touch</p>
-          <a href="mailto:contact@championcircuit.com" className="cta-contact__email">
-            contact@championcircuit.com
+          <a href="mailto:official@championcircuit.com" className="cta-contact__email">
+            official@championcircuit.com
           </a>
           <address className="cta-contact__address">
             83, S. P. Mukherjee Road, Devi Market,<br />

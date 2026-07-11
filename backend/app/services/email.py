@@ -85,7 +85,7 @@ def send_voucher_email(to_email: str, code: str, benefit: str) -> bool:
         f"Use this code when booking your first turf slot or registering for a tournament.\n\n"
         f"See you on the circuit.\n"
         f"— Champion Circuit Team\n"
-        f"contact@championcircuit.com"
+        f"official@championcircuit.com"
     )
 
     html = f"""
@@ -125,7 +125,7 @@ def send_voucher_email(to_email: str, code: str, benefit: str) -> bool:
       <td style="padding:16px 32px;border-top:1px solid rgba(255,255,255,0.08);">
         <p style="margin:0;font-size:12px;color:rgba(245,245,245,0.3);">
           &copy; 2026 Champion Circuit Private Limited &nbsp;·&nbsp;
-          <a href="mailto:contact@championcircuit.com" style="color:rgba(245,245,245,0.4);text-decoration:none;">contact@championcircuit.com</a>
+          <a href="mailto:official@championcircuit.com" style="color:rgba(245,245,245,0.4);text-decoration:none;">official@championcircuit.com</a>
         </p>
       </td>
     </tr>
@@ -184,7 +184,7 @@ def send_voucher_delivery_email(
     plain = f"{greeting}\n\nYour Champion Circuit voucher(s):\n\n"
     for code, title, value_label in vouchers:
         plain += f"  {title}\n  Code: {code}\n  {value_label} at {partner_name}\n\n"
-    plain += "Show this code (or QR) at the venue to redeem.\n\ncontact@championcircuit.com"
+    plain += "Show this code (or QR) at the venue to redeem.\n\nofficial@championcircuit.com"
 
     html = f"""
 <!DOCTYPE html>
@@ -213,7 +213,7 @@ def send_voucher_delivery_email(
       <td style="padding:20px 28px;">
         <p style="margin:0;font-size:13px;color:rgba(245,245,245,0.45);line-height:1.7;">
           Show this code or QR at the venue to redeem.<br>
-          Questions? <a href="mailto:contact@championcircuit.com" style="color:rgba(245,245,245,0.6);">contact@championcircuit.com</a>
+          Questions? <a href="mailto:official@championcircuit.com" style="color:rgba(245,245,245,0.6);">official@championcircuit.com</a>
         </p>
       </td>
     </tr>
@@ -267,7 +267,7 @@ def send_welcome_email(to_email: str, username: str, name: str = "") -> bool:
         f"Your profile is live at: https://championcircuit.com/profile\n\n"
         f"See you on the circuit.\n"
         f"— The Champion Circuit Team\n"
-        f"contact@championcircuit.com"
+        f"official@championcircuit.com"
     )
 
     html = f"""
@@ -337,7 +337,7 @@ def send_welcome_email(to_email: str, username: str, name: str = "") -> bool:
         <p style="margin:0;font-size:12px;color:rgba(232,244,244,0.35);line-height:1.6;">
           You received this because you signed up at Champion Circuit.<br>
           &copy; 2026 Champion Circuit Private Limited &nbsp;·&nbsp;
-          <a href="mailto:contact@championcircuit.com" style="color:rgba(232,244,244,0.5);text-decoration:none;">contact@championcircuit.com</a>
+          <a href="mailto:official@championcircuit.com" style="color:rgba(232,244,244,0.5);text-decoration:none;">official@championcircuit.com</a>
         </p>
       </td>
     </tr>

@@ -13,10 +13,10 @@ export function Footer() {
           <Link to="/esports">Esports</Link>
           <Link to="/leaderboard">Leaderboard</Link>
           <Link to="/about">About</Link>
-          <a href="mailto:contact@championcircuit.com">Contact</a>
+          <a href="mailto:official@championcircuit.com">Contact</a>
         </nav>
         <div className="footer-contact muted small">
-          <a href="mailto:contact@championcircuit.com">contact@championcircuit.com</a>
+          <a href="mailto:official@championcircuit.com">official@championcircuit.com</a>
         </div>
         <span className="footer-copy">
           &copy; {new Date().getFullYear()} Champion Circuit Private Limited. All rights reserved.

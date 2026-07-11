@@ -27,12 +27,6 @@ const FOUNDERS = [
     note: 'Ex-STAN, W2 (Hashed Emergent Group), KGeN, Rooter. 7+ years of experience driving growth, GTM, and ecosystem strategy across gaming, esports, and Web3.',
     photo: '/founders/chaitradip-sarkar.png',
   },
-  {
-    name: 'Saptarshee Ghosh',
-    role: 'Head of Marketing',
-    note: '6+ years in Growth, Marketing & Creative Strategy. Worked with renowned brands. Recognized by Pinewood Studios, featured in PCI.',
-    photo: '/founders/Saptarshee_Ghosh.png',
-  },
 ] as const;
 
 const ADVISORS = [
