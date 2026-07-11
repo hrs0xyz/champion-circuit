@@ -210,7 +210,7 @@ def upsert_google_user(db: Session, email: str, name: str = "", avatar_url: str 
 
 def authenticate_user(db: Session, identifier: str, password: str) -> User | None:
     user = get_user_by_identifier(db, identifier)
-    if not user or not user.hashed_password:
+    if not user or not user.hashed_password or not user.is_active:
         return None
     return user if verify_password(password, user.hashed_password) else None
 
