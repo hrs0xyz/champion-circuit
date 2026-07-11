@@ -212,9 +212,17 @@ def compute_leaderboard(
 ) -> list[dict]:
     """
     Compute leaderboard from match_participants + score_adjustments.
+    period_type: all_time (default) | weekly (last 7 days) | monthly (last 30 days).
     Returns list of dicts sorted by total_points desc.
     """
     from collections import defaultdict
+    from datetime import datetime, timedelta, timezone
+
+    cutoff = None
+    if period_type == "weekly":
+        cutoff = datetime.now(timezone.utc) - timedelta(days=7)
+    elif period_type == "monthly":
+        cutoff = datetime.now(timezone.utc) - timedelta(days=30)
 
     # Gather points from verified matches
     q = (
@@ -223,6 +231,9 @@ def compute_leaderboard(
         .join(User, MatchParticipant.user_id == User.id)
         .filter(Match.status == "completed")
     )
+    if cutoff:
+        # verified_at is an ISO-8601 string; lexicographic comparison is chronological
+        q = q.filter(Match.verified_at >= cutoff.isoformat())
     if scope_type == "venue" and scope_id:
         q = q.filter(Match.venue_id == int(scope_id))
     elif scope_type == "city" and scope_id:
@@ -249,6 +260,8 @@ def compute_leaderboard(
 
     # Apply score adjustments
     adj_q = db.query(ScoreAdjustment)
+    if cutoff:
+        adj_q = adj_q.filter(ScoreAdjustment.created_at >= cutoff)
     for adj in adj_q.all():
         if adj.user_id in stats:
             stats[adj.user_id]["total_points"] += adj.delta_points
@@ -489,7 +502,10 @@ def _notify(db: Session, user_id: int, ntype: str, title: str, body: str, link: 
         link=link,
     )
     db.add(notif)
-    # Don't commit here — caller commits
+    # Commit here: every caller invokes _notify after its own final commit, and
+    # the request-scoped session closes without committing — without this the
+    # notification row is silently discarded.
+    db.commit()
 
 
 def get_notifications(db: Session, user_id: int, unread_only: bool = False) -> list[Notification]:

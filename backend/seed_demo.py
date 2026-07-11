@@ -88,6 +88,9 @@ for data in listings_data:
         print(f"  Listing already exists: {data['title']}")
 
 db.commit()
+# Read before close() — the instance is detached afterwards and attribute
+# access would raise DetachedInstanceError.
+referral_token = partner.partner_token
 db.close()
 print("\nDone! Visit http://127.0.0.1:5173/vouchers to see the listings.")
-print(f"Partner referral link: http://127.0.0.1:5173/vouchers?ref={partner.partner_token}")
+print(f"Partner referral link: http://127.0.0.1:5173/vouchers?ref={referral_token}")

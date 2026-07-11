@@ -253,6 +253,19 @@ def create_booking(db: Session, user_id: int, payload: BookingCreate) -> Booking
     slot = db.get(ListingSlot, payload.slot_id)
     if not slot:
         raise ValueError("Slot not found")
+    if slot.is_blocked:
+        raise ValueError("This slot is currently unavailable")
+    taken = (
+        db.query(Booking)
+        .filter(
+            Booking.slot_id == slot.id,
+            Booking.booking_date == payload.booking_date,
+            Booking.status != "cancelled",
+        )
+        .count()
+    )
+    if taken >= slot.max_bookings:
+        raise ValueError("This slot is fully booked for that date")
     booking = Booking(
         listing_id=payload.listing_id,
         slot_id=payload.slot_id,
