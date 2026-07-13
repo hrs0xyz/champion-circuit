@@ -29,14 +29,14 @@ const FOUNDERS = [
   },
 ] as const;
 
-const ADVISORS = [
-  {
-    name: 'Arnab Mandal',
-    role: 'Advisor',
-    note: 'Polymath and dynamic versatile leader with 16+ years of rich diverse experience in addition to a world-class education. London Business School — Executive Education, Leadership.',
-    photo: '/founders/Arnab_Mandal.png',
-  },
-] as const;
+// const ADVISORS = [
+//   {
+//     name: 'Arnab Mandal',
+//     role: 'Advisor',
+//     note: 'Polymath and dynamic versatile leader with 16+ years of rich diverse experience in addition to a world-class education. London Business School — Executive Education, Leadership.',
+//     photo: '/founders/Arnab_Mandal.png',
+//   },
+// ] as const;
 
 export function FoundersSection() {
   return (
@@ -68,7 +68,7 @@ export function FoundersSection() {
         </PageContainer>
       </motion.section>
 
-      <motion.section
+      {/* <motion.section
         id="advisors"
         className="section section-advisors"
         initial={{ opacity: 0, y: 32 }}
@@ -93,7 +93,7 @@ export function FoundersSection() {
             ))}
           </div>
         </PageContainer>
-      </motion.section>
+      </motion.section> */}
     </>
   );
 }
