@@ -12,6 +12,7 @@ import {
   type Category, type MyVenueData, type Tournament,
   type Venue, type VenueListing, type VenueCoverPhoto,
 } from '../../lib/ccApi';
+import { TournamentWizard } from '../../components/tournaments/TournamentWizard';
 
 type Tab = 'overview' | 'venue' | 'listings' | 'bookings' | 'tournaments';
 
@@ -110,7 +111,10 @@ export function TurfOwnerPage() {
               <BookingsPanel bookings={bookings} listings={listings}
                 onChanged={() => { void reload(); }} onMsg={notify} />
             )}
-            {tab === 'tournaments' && <VenueTournaments tournaments={tournaments} onMsg={notify} />}
+            {tab === 'tournaments' && (
+              <VenueTournaments tournaments={tournaments} hasVenue={Boolean(venue)}
+                onChanged={() => { void reload(); }} onMsg={notify} />
+            )}
           </>
         )}
       </main>
@@ -909,12 +913,15 @@ function BookingsPanel({ bookings, listings, onChanged, onMsg }: {
 
 // ── Tournaments ───────────────────────────────────────────────────────────────
 
-function VenueTournaments({ tournaments, onMsg }: {
+function VenueTournaments({ tournaments, hasVenue, onChanged, onMsg }: {
   tournaments: Tournament[];
+  hasVenue: boolean;
+  onChanged: () => void;
   onMsg: (m: string, kind?: 'ok' | 'err') => void;
 }) {
   const [assigning, setAssigning] = useState<number | null>(null);
   const [username, setUsername] = useState('');
+  const [showWizard, setShowWizard] = useState(false);
 
   async function assign(tId: number) {
     try {
@@ -924,21 +931,77 @@ function VenueTournaments({ tournaments, onMsg }: {
     } catch (e) { onMsg(e instanceof ApiError ? e.message : 'Failed.', 'err'); }
   }
 
+  async function submitForApproval(t: Tournament) {
+    if (!window.confirm(`Submit "${t.name}" for platform approval?`)) return;
+    try {
+      await ccApi.submitTournamentForApproval(t.id);
+      onMsg(`"${t.name}" submitted — the platform admin has been notified.`);
+      onChanged();
+    } catch (e) { onMsg(e instanceof ApiError ? e.message : 'Failed.', 'err'); }
+  }
+
+  async function downloadCsv(t: Tournament) {
+    try { await ccApi.downloadRegistrationsCsv(t.id, t.slug); }
+    catch (e) { onMsg(e instanceof ApiError ? e.message : 'Download failed.', 'err'); }
+  }
+
   return (
     <div className="staff-section">
-      <h2 className="staff-h2">Tournaments ({tournaments.length})</h2>
-      {tournaments.length === 0 ? (
-        <p className="muted">No tournaments at your venue yet. Create one via the API or ask super admin.</p>
+      <div className="staff-section__header">
+        <h2 className="staff-h2">Tournaments ({tournaments.length})</h2>
+        {hasVenue ? (
+          <button type="button" className="btn btn-primary btn-sm" onClick={() => setShowWizard((v) => !v)}>
+            {showWizard ? 'Close wizard' : '+ Create tournament'}
+          </button>
+        ) : null}
+      </div>
+
+      {showWizard ? (
+        <TournamentWizard
+          venues={null}
+          isAdmin={false}
+          create={(payload) => ccApi.createVenueTournament(payload)}
+          onDone={(_t, message) => { setShowWizard(false); onMsg(message); onChanged(); }}
+          onClose={() => setShowWizard(false)}
+        />
+      ) : null}
+
+      {tournaments.length === 0 && !showWizard ? (
+        <p className="muted">
+          {hasVenue
+            ? 'No tournaments at your venue yet — create one above. It goes live once the platform admin approves it.'
+            : 'Set up your venue first, then create tournaments here.'}
+        </p>
       ) : tournaments.map((t) => (
         <div key={t.id} className="staff-card">
           <div className="staff-card__header">
             <div>
               <h3 className="staff-card__title">{t.name}</h3>
-              <p className="staff-card__meta">{t.game} · {t.participant_count}/{t.max_participants} · {t.status}</p>
+              <p className="staff-card__meta">
+                {t.game} · {t.participant_count}/{t.max_participants}
+                {t.entry_fee_paise === 0 ? ' · FREE' : ` · ₹${t.entry_fee_paise / 100}`}
+              </p>
             </div>
+            <span className={`staff-badge${t.status === 'pending_approval' ? ' staff-badge--admin' : t.status === 'registration' || t.status === 'live' ? ' staff-badge--active' : ''}`}>
+              {t.status.replace('_', ' ')}
+            </span>
+          </div>
+          <div className="staff-trn-actions">
+            {t.status === 'draft' ? (
+              <button type="button" className="btn btn-primary btn-sm" onClick={() => void submitForApproval(t)}>
+                Submit for approval
+              </button>
+            ) : null}
+            {t.status === 'pending_approval' ? (
+              <span className="muted small">Waiting for platform approval…</span>
+            ) : null}
+            <button type="button" className="staff-action-btn" onClick={() => void downloadCsv(t)}>
+              ⬇ Registrations CSV
+            </button>
             <button type="button" className="btn btn-secondary btn-sm" onClick={() => setAssigning(t.id)}>
               Assign match admin
             </button>
+            <Link className="staff-action-btn" to="/staff/match">Manage matches →</Link>
           </div>
           {assigning === t.id && (
             <div className="staff-inline-form">
