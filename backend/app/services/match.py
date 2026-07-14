@@ -867,6 +867,144 @@ def maybe_auto_cancel(db: Session, t: Tournament) -> bool:
     return True
 
 
+def check_in_registration(
+    db: Session, tournament_id: int, code: str = "", user_id: int = 0,
+) -> TournamentRegistration:
+    """
+    Match-day check-in by short code (or full QR payload "CCT|{tid}|{code}")
+    or by user id. Rejects double check-ins.
+    """
+    t = db.get(Tournament, tournament_id)
+    if not t:
+        raise ValueError("Tournament not found")
+    q = db.query(TournamentRegistration).filter(
+        TournamentRegistration.tournament_id == tournament_id
+    )
+    if code:
+        raw = code.strip()
+        if "|" in raw:   # full QR payload — take the trailing code segment
+            raw = raw.split("|")[-1]
+        reg = q.filter(func.upper(TournamentRegistration.checkin_code) == raw.upper()).first()
+        if not reg:
+            raise ValueError("No registration matches that code")
+    elif user_id:
+        reg = q.filter(TournamentRegistration.user_id == user_id).first()
+        if not reg:
+            raise ValueError("That user is not registered for this tournament")
+    else:
+        raise ValueError("Provide a check-in code or a user")
+
+    if reg.checked_in_at:
+        raise ValueError(f"Already checked in at {_fmt_when(reg.checked_in_at) or reg.checked_in_at}")
+    reg.checked_in_at = _iso_now()
+    db.commit()
+    db.refresh(reg)
+    _notify(db, reg.user_id, "tournament_checkin",
+            f"Checked in — {t.name}",
+            "You're checked in. Good luck out there!",
+            f"/tournaments/{t.slug}")
+    return reg
+
+
+def remind_checkin(db: Session, t: Tournament) -> int:
+    """Nudge every registrant who hasn't checked in yet. Returns count."""
+    pending = db.query(TournamentRegistration).filter(
+        TournamentRegistration.tournament_id == t.id,
+        TournamentRegistration.checked_in_at == "",
+    ).all()
+    for reg in pending:
+        _notify(db, reg.user_id, "tournament_checkin",
+                f"Check in for {t.name}",
+                "Show your QR code (in My Matches → Tournaments) at the venue desk to check in.",
+                f"/tournaments/{t.slug}")
+    return len(pending)
+
+
+def registrations_csv(db: Session, t: Tournament) -> str:
+    """Spreadsheet of registrations for organizer ops (the 'Google Form' export)."""
+    import csv
+    import io
+
+    buf = io.StringIO()
+    writer = csv.writer(buf)
+    writer.writerow([
+        "registration_id", "name", "username", "email", "phone", "team",
+        "roster", "payment_status", "checked_in", "seed", "registered_at",
+    ])
+    regs = (
+        db.query(TournamentRegistration)
+        .filter(TournamentRegistration.tournament_id == t.id)
+        .order_by(TournamentRegistration.registered_at.asc())
+        .all()
+    )
+    for reg in regs:
+        u = db.get(User, reg.user_id)
+        team = db.get(Team, reg.team_id) if reg.team_id else None
+        try:
+            roster = json.loads(reg.roster_json or "[]")
+        except ValueError:
+            roster = []
+        roster_str = "; ".join(
+            f"{m.get('name', '')} ({m.get('phone', '')})" for m in roster
+        )
+        writer.writerow([
+            reg.id,
+            reg.contact_name or (u.name if u else ""),
+            u.username if u else "",
+            u.email if u else "",
+            reg.contact_phone or (u.phone if u else ""),
+            team.name if team else "",
+            roster_str,
+            reg.payment_status,
+            reg.checked_in_at or "no",
+            reg.seed_number,
+            reg.registered_at.isoformat() if reg.registered_at else "",
+        ])
+    return buf.getvalue()
+
+
+# ── Venue-owner approval flow ─────────────────────────────────────────────────
+
+def submit_tournament_for_approval(db: Session, t: Tournament, submitter: User) -> None:
+    if t.status != "draft":
+        raise ValueError("Only draft tournaments can be submitted for approval")
+    t.status = "pending_approval"
+    db.commit()
+    admins = db.query(User).filter(
+        User.is_admin == True, User.is_active == True  # noqa: E712
+    ).all()
+    for a in admins:
+        _notify(db, a.id, "system",
+                f"Tournament pending approval: {t.name}",
+                f"@{submitter.username} submitted \"{t.name}\" for approval.",
+                "/staff/admin")
+
+
+def approve_tournament(db: Session, t: Tournament) -> None:
+    if t.status != "pending_approval":
+        raise ValueError("Tournament is not pending approval")
+    t.status = "registration"
+    t.registration_open = True
+    db.commit()
+    if t.created_by:
+        _notify(db, t.created_by, "system",
+                f"{t.name} approved",
+                "Your tournament has been approved and is open for registrations.",
+                f"/tournaments/{t.slug}")
+
+
+def reject_tournament(db: Session, t: Tournament, reason: str = "") -> None:
+    if t.status != "pending_approval":
+        raise ValueError("Tournament is not pending approval")
+    t.status = "draft"
+    db.commit()
+    if t.created_by:
+        body = "Your tournament was sent back to draft."
+        if reason:
+            body += f" Reason: {reason}"
+        _notify(db, t.created_by, "system", f"{t.name} needs changes", body, "/staff/venue")
+
+
 def cancel_tournament(db: Session, t: Tournament, reason: str = "") -> None:
     """Manual cancellation by staff — notifies every registrant."""
     if t.status in ("completed", "cancelled"):

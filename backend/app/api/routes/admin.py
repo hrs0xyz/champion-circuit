@@ -46,18 +46,28 @@ from app.models.match import (
 )
 from app.models.user import User
 from app.models.venue import Venue
-from app.schemas.match import GenerateBracketPayload, StageCreate, StageUpdate, WalkoverPayload
+from app.schemas.match import (
+    CheckInPayload, GenerateBracketPayload, StageCreate, StageUpdate,
+    TournamentCreate, WalkoverPayload,
+)
 from app.services.match import (
+    approve_tournament,
     block_stage_slots,
     cancel_tournament,
+    check_in_registration,
     create_match,
+    create_tournament,
     generate_bracket,
     list_tournaments,
     maybe_auto_cancel,
+    registrations_csv,
+    reject_tournament,
+    remind_checkin,
     serialize_bracket,
     serialize_match,
     serialize_stage,
     serialize_tournament,
+    submit_tournament_for_approval,
     verify_match,
     walkover_match,
 )
@@ -532,17 +542,31 @@ def tournament_participants(
 ):
     if not is_tournament_admin(db, current_user, tournament_id):
         raise HTTPException(status_code=403, detail="Not assigned to this tournament")
+    import json as _json
     regs = db.query(TournamentRegistration).filter(
         TournamentRegistration.tournament_id == tournament_id
-    ).all()
+    ).order_by(TournamentRegistration.registered_at.asc()).all()
     result = []
     for r in regs:
         u = db.get(User, r.user_id)
-        if u:
-            result.append({
-                "user_id": u.id, "username": u.username, "name": u.name,
-                "payment_status": r.payment_status, "registered_at": r.registered_at,
-            })
+        if not u:
+            continue
+        team = db.get(Team, r.team_id) if r.team_id else None
+        try:
+            roster = _json.loads(r.roster_json or "[]")
+        except ValueError:
+            roster = []
+        result.append({
+            "user_id": u.id, "username": u.username, "name": u.name,
+            "phone": r.contact_phone or u.phone,
+            "team_name": team.name if team else "",
+            "roster": roster,
+            "seed_number": r.seed_number,
+            "payment_status": r.payment_status,
+            "checked_in_at": r.checked_in_at,
+            "checkin_code": r.checkin_code,
+            "registered_at": r.registered_at,
+        })
     return result
 
 
@@ -571,9 +595,16 @@ def edit_match(
         raise HTTPException(status_code=404, detail="Match not found")
     if not is_tournament_admin(db, current_user, match.tournament_id or 0) and not current_user.is_admin:
         raise HTTPException(status_code=403, detail="Not authorised to edit this match")
+    if match.round_number > 0 and match.status == "completed":
+        # A verified bracket match has already advanced its winner —
+        # editing scores now would desync results from the bracket
+        raise HTTPException(
+            status_code=400,
+            detail="This bracket match is verified — its result has already advanced",
+        )
 
-    # Update match fields
-    for field in ("notes", "played_at", "match_type", "game_mode"):
+    # Update match fields (scheduled_at = station-wave scheduling per match)
+    for field in ("notes", "played_at", "match_type", "game_mode", "scheduled_at"):
         if field in payload:
             setattr(match, field, payload[field])
 
@@ -630,6 +661,136 @@ def staff_walkover_match(
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     return serialize_match(match)
+
+
+# ── Match-day check-in & registration export ──────────────────────────────────
+
+@router.post("/staff/tournaments/{tournament_id}/check-in")
+def staff_check_in(
+    tournament_id: int,
+    payload: CheckInPayload,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    if not is_tournament_admin(db, current_user, tournament_id):
+        raise HTTPException(status_code=403, detail="Not assigned to this tournament")
+    try:
+        reg = check_in_registration(db, tournament_id, code=payload.code, user_id=payload.user_id)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    u = db.get(User, reg.user_id)
+    return {
+        "message": f"@{u.username if u else reg.user_id} checked in",
+        "user_id": reg.user_id,
+        "checked_in_at": reg.checked_in_at,
+    }
+
+
+@router.post("/staff/tournaments/{tournament_id}/remind-checkin")
+def staff_remind_checkin(
+    tournament_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Admin-triggered nudge to everyone not yet checked in (no scheduler)."""
+    if not is_tournament_admin(db, current_user, tournament_id):
+        raise HTTPException(status_code=403, detail="Not assigned to this tournament")
+    t = db.get(Tournament, tournament_id)
+    if not t:
+        raise HTTPException(status_code=404, detail="Tournament not found")
+    notified = remind_checkin(db, t)
+    return {"notified": notified}
+
+
+@router.get("/staff/tournaments/{tournament_id}/registrations.csv")
+def download_registrations_csv(
+    tournament_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    if not is_tournament_admin(db, current_user, tournament_id):
+        raise HTTPException(status_code=403, detail="Not assigned to this tournament")
+    t = db.get(Tournament, tournament_id)
+    if not t:
+        raise HTTPException(status_code=404, detail="Tournament not found")
+    from fastapi import Response
+    return Response(
+        content=registrations_csv(db, t),
+        media_type="text/csv",
+        headers={"Content-Disposition": f'attachment; filename="{t.slug}-registrations.csv"'},
+    )
+
+
+# ── Venue-owner tournament creation (draft → approval) ────────────────────────
+
+@router.post("/staff/venue-tournaments", status_code=status.HTTP_201_CREATED)
+def create_venue_tournament(
+    payload: TournamentCreate,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Venue owners create tournaments at their own venue only. They land as
+    drafts and need super-admin approval before going public.
+    """
+    _require_venue_staff(current_user)
+    venue = get_user_venue(db, current_user.id)
+    if not venue:
+        raise HTTPException(status_code=400, detail="Create your venue first")
+    payload.venue_id = venue.id           # forced: own venue only
+    payload.is_featured = False           # platform-level flag stays locked
+    payload.registration_open = False     # opens on approval
+    t = create_tournament(db, payload, current_user.id)
+    return serialize_tournament(t, db)
+
+
+@router.post("/staff/tournaments/{tournament_id}/submit-for-approval")
+def submit_for_approval(
+    tournament_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    t = require_tournament_manage_access(db, current_user, tournament_id)
+    try:
+        submit_tournament_for_approval(db, t, current_user)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    return serialize_tournament(t, db)
+
+
+@router.post("/admin/tournaments/{tournament_id}/approve")
+def approve_tournament_route(
+    tournament_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    _require_admin(current_user)
+    t = db.get(Tournament, tournament_id)
+    if not t:
+        raise HTTPException(status_code=404, detail="Tournament not found")
+    try:
+        approve_tournament(db, t)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    return serialize_tournament(t, db)
+
+
+@router.post("/admin/tournaments/{tournament_id}/reject")
+def reject_tournament_route(
+    tournament_id: int,
+    payload: dict | None = None,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    _require_admin(current_user)
+    t = db.get(Tournament, tournament_id)
+    if not t:
+        raise HTTPException(status_code=404, detail="Tournament not found")
+    try:
+        reject_tournament(db, t, (payload or {}).get("reason", ""))
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    return serialize_tournament(t, db)
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
