@@ -77,6 +77,7 @@ from app.services.match import (
     publish_news,
     record_tournament_result,
     register_for_tournament,
+    serialize_bracket,
     serialize_match,
     serialize_my_registration,
     serialize_news,
@@ -304,6 +305,17 @@ def tournament_detail(tournament_id: int, db: Session = Depends(get_db)):
     if not t:
         raise HTTPException(status_code=404, detail="Tournament not found")
     return serialize_tournament(t, db)
+
+
+@router.get("/tournaments/{tournament_id}/bracket")
+def tournament_bracket(tournament_id: int, db: Session = Depends(get_db)):
+    t = get_tournament(db, tournament_id)
+    if not t or t.status in ("draft", "pending_approval"):
+        raise HTTPException(status_code=404, detail="Tournament not found")
+    bracket = serialize_bracket(t, db)
+    if not bracket["stages"]:
+        raise HTTPException(status_code=404, detail="Bracket not generated yet")
+    return bracket
 
 
 @router.put("/tournaments/{tournament_id}")

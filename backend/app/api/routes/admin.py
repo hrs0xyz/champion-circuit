@@ -40,10 +40,27 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user, is_tournament_admin, require_tournament_manage_access
 from app.db.session import get_db
-from app.models.match import Match, MatchParticipant, Tournament, TournamentAdmin, TournamentRegistration
+from app.models.match import (
+    Match, MatchParticipant, Team, Tournament, TournamentAdmin,
+    TournamentRegistration, TournamentStage,
+)
 from app.models.user import User
 from app.models.venue import Venue
-from app.services.match import create_match, serialize_match, verify_match
+from app.schemas.match import GenerateBracketPayload, StageCreate, StageUpdate, WalkoverPayload
+from app.services.match import (
+    block_stage_slots,
+    cancel_tournament,
+    create_match,
+    generate_bracket,
+    list_tournaments,
+    maybe_auto_cancel,
+    serialize_bracket,
+    serialize_match,
+    serialize_stage,
+    serialize_tournament,
+    verify_match,
+    walkover_match,
+)
 from app.services.venue import get_user_venue, serialize_venue
 
 router = APIRouter()
@@ -285,6 +302,140 @@ def list_tournament_admins(
     return result
 
 
+# ── Tournament management (stages, bracket, lifecycle) ────────────────────────
+
+@router.get("/admin/tournaments")
+def admin_list_tournaments(
+    status_filter: str = "",
+    skip: int = 0,
+    limit: int = 100,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Super-admin list — includes drafts and pending approvals."""
+    _require_admin(current_user)
+    ts = list_tournaments(db, status=status_filter, skip=skip, limit=min(limit, 200))
+    return [serialize_tournament(t, db) for t in ts]
+
+
+@router.get("/admin/tournaments/{tournament_id}/stages")
+def list_stages(
+    tournament_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    t = require_tournament_manage_access(db, current_user, tournament_id)
+    return [serialize_stage(db, s) for s in t.stages]
+
+
+@router.post("/admin/tournaments/{tournament_id}/stages", status_code=status.HTTP_201_CREATED)
+def create_stage(
+    tournament_id: int,
+    payload: StageCreate,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    t = require_tournament_manage_access(db, current_user, tournament_id)
+    if t.status in ("completed", "cancelled"):
+        raise HTTPException(status_code=400, detail=f"Tournament is {t.status}")
+    data = payload.model_dump()
+    data["venue_id"] = data.get("venue_id") or None
+    if data["venue_id"] and not db.get(Venue, data["venue_id"]):
+        raise HTTPException(status_code=404, detail="Stage venue not found")
+    stage = TournamentStage(tournament_id=t.id, **data)
+    db.add(stage)
+    db.commit()
+    db.refresh(stage)
+    return serialize_stage(db, stage)
+
+
+@router.put("/admin/stages/{stage_id}")
+def update_stage(
+    stage_id: int,
+    payload: StageUpdate,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    stage = db.get(TournamentStage, stage_id)
+    if not stage:
+        raise HTTPException(status_code=404, detail="Stage not found")
+    require_tournament_manage_access(db, current_user, stage.tournament_id)
+    data = payload.model_dump(exclude_unset=True)
+    if "venue_id" in data:
+        data["venue_id"] = data["venue_id"] or None
+        if data["venue_id"] and not db.get(Venue, data["venue_id"]):
+            raise HTTPException(status_code=404, detail="Stage venue not found")
+    for key, val in data.items():
+        setattr(stage, key, val)
+    db.commit()
+    db.refresh(stage)
+    return serialize_stage(db, stage)
+
+
+@router.delete("/admin/stages/{stage_id}")
+def delete_stage(
+    stage_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    stage = db.get(TournamentStage, stage_id)
+    if not stage:
+        raise HTTPException(status_code=404, detail="Stage not found")
+    require_tournament_manage_access(db, current_user, stage.tournament_id)
+    # matches.stage_id is ON DELETE SET NULL — the bracket serializer groups
+    # orphaned rounds under a pseudo-stage, so deletion is always safe
+    db.delete(stage)
+    db.commit()
+    return {"message": "Stage deleted"}
+
+
+@router.post("/admin/tournaments/{tournament_id}/generate-bracket")
+def generate_bracket_route(
+    tournament_id: int,
+    payload: GenerateBracketPayload | None = None,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    t = require_tournament_manage_access(db, current_user, tournament_id)
+    try:
+        generate_bracket(
+            db, t.id, current_user.id,
+            (payload.round_stage_map if payload else None) or None,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    return serialize_bracket(t, db)
+
+
+@router.post("/admin/tournaments/{tournament_id}/block-slots")
+def block_tournament_slots(
+    tournament_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    t = require_tournament_manage_access(db, current_user, tournament_id)
+    summary = block_stage_slots(db, t)
+    return {
+        "blocked": summary,
+        "conflicts": [row for row in summary if row["existing_bookings"] > 0],
+    }
+
+
+@router.post("/admin/tournaments/{tournament_id}/cancel")
+def cancel_tournament_route(
+    tournament_id: int,
+    payload: dict | None = None,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    t = require_tournament_manage_access(db, current_user, tournament_id)
+    try:
+        cancel_tournament(db, t, (payload or {}).get("reason", ""))
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    return serialize_tournament(t, db)
+
+
 # ── Turf Owner / Match Admin — Staff portal ───────────────────────────────────
 
 @router.get("/staff/my-venue")
@@ -331,7 +482,45 @@ def my_tournaments(
     else:
         ts = db.query(Tournament).filter(Tournament.venue_id == venue_id).all() if venue_id else []
 
-    from app.services.match import serialize_tournament
+    return [serialize_tournament(t, db) for t in ts]
+
+
+@router.get("/staff/assigned-tournaments")
+def assigned_tournaments(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Tournaments the caller can operate on: super admin → all; venue owner →
+    at their venue; match admin → assigned via TournamentAdmin. Non-staff
+    users simply get an empty list.
+    """
+    if current_user.is_admin:
+        ts = db.query(Tournament).order_by(Tournament.starts_at.desc()).all()
+    else:
+        ids: set[int] = set()
+        if current_user.is_venue_owner:
+            v = get_user_venue(db, current_user.id)
+            if v:
+                ids |= {
+                    row.id for row in
+                    db.query(Tournament.id).filter(Tournament.venue_id == v.id).all()
+                }
+        ids |= {
+            row.tournament_id for row in
+            db.query(TournamentAdmin.tournament_id)
+            .filter(TournamentAdmin.user_id == current_user.id).all()
+        }
+        if not ids:
+            return []
+        ts = (
+            db.query(Tournament)
+            .filter(Tournament.id.in_(ids))
+            .order_by(Tournament.starts_at.desc())
+            .all()
+        )
+    for t in ts:
+        maybe_auto_cancel(db, t)   # lazy deadline enforcement
     return [serialize_tournament(t, db) for t in ts]
 
 
@@ -418,6 +607,26 @@ def staff_verify_match(
         raise HTTPException(status_code=403, detail="Not authorised")
     try:
         match = verify_match(db, match_id, current_user.id)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    return serialize_match(match)
+
+
+@router.post("/staff/matches/{match_id}/walkover")
+def staff_walkover_match(
+    match_id: int,
+    payload: WalkoverPayload,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Resolve a no-show: chosen side wins, match verifies + advances normally."""
+    match = db.get(Match, match_id)
+    if not match:
+        raise HTTPException(status_code=404, detail="Match not found")
+    if not is_tournament_admin(db, current_user, match.tournament_id or 0) and not current_user.is_admin:
+        raise HTTPException(status_code=403, detail="Not authorised")
+    try:
+        match = walkover_match(db, match_id, payload.winner_side, current_user.id, payload.reason)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     return serialize_match(match)
