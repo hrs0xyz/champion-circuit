@@ -103,9 +103,18 @@ export interface MatchParticipant {
 
 export interface Match {
   id: number; venue_id: number; listing_id: number;
+  tournament_id: number | null;
   match_type: string; game_mode: string; status: string;
   played_at: string; duration_minutes: number; notes: string;
   verified_at: string;
+  /** Bracket fields — 0/empty for casual & ranked matches */
+  stage_id: number | null;
+  round_number: number;
+  bracket_position: number;
+  next_match_id: number | null;
+  next_match_slot: string;
+  is_bye: boolean;
+  scheduled_at: string;
   participants: MatchParticipant[];
 }
 
@@ -115,20 +124,134 @@ export interface LeaderboardRow {
   wins: number; losses: number; draws: number;
 }
 
+export interface TournamentVenueBrief {
+  id: number; name: string; city: string;
+  address_line1: string; lat: string; lng: string;
+}
+
 export interface Tournament {
   id: number; name: string; slug: string;
   description: string; rules: string; game: string;
-  format: string; mode: string; max_participants: number;
+  format: string; mode: string;
+  max_participants: number; min_participants: number;
   entry_fee_paise: number; prize_pool_paise: number; prize_description: string;
   registration_open: boolean; registration_deadline: string;
   starts_at: string; ends_at: string; status: string;
-  is_exclusive: boolean; is_featured: boolean; banner_url: string;
+  is_exclusive: boolean; is_featured: boolean;
+  awards_leaderboard_points: boolean;
+  banner_url: string;
   participant_count: number;
+  venue_id: number | null;
+  venue: TournamentVenueBrief | null;
+  /** open status + reg flag + deadline not passed + seats left, computed server-side */
+  registration_effectively_open: boolean;
+}
+
+export interface TournamentStage {
+  id: number; tournament_id: number; name: string; stage_order: number;
+  venue_id: number | null; venue: TournamentVenueBrief | null;
+  is_online: boolean;
+  location_name: string; address: string; lat: string; lng: string;
+  starts_at: string; ends_at: string; notes: string;
+}
+
+export interface TournamentParticipant {
+  user_id: number; username: string; name: string; avatar_url: string;
+  team_name: string; seed_number: number; checked_in: boolean;
+}
+
+export interface TournamentPodiumEntry {
+  position: number; user_id: number | null; username: string; name: string;
+  team_name: string; points_earned: number; prize_won_paise: number;
+}
+
+export interface RosterEntry { user_id: number; name: string; phone: string; }
+
+export interface NextMatchInfo {
+  id: number; round_number: number; round_of: number; total_rounds: number;
+  status: string; scheduled_at: string; opponent_name: string; venue_name: string;
+}
+
+export interface MyRegistration {
+  id: number; tournament_id: number; user_id: number;
+  team_id: number | null; team_name: string;
+  payment_status: string; seed_number: number;
+  checked_in_at: string; checkin_code: string;
+  contact_name: string; contact_phone: string;
+  roster: RosterEntry[]; registered_at: string;
+  qr_svg: string;
+  next_match: NextMatchInfo | null;
+}
+
+export interface TournamentDetail extends Tournament {
+  stages: TournamentStage[];
+  participants: TournamentParticipant[];
+  results: TournamentPodiumEntry[];
+  my_registration: MyRegistration | null;
+  on_waitlist: boolean;
+}
+
+export interface RegisterPayload {
+  team_id?: number;
+  contact_name?: string;
+  contact_phone?: string;
+  roster?: RosterEntry[];
+}
+
+export interface MyTournamentRegistration {
+  tournament: Tournament;
+  registration: MyRegistration;
+}
+
+export interface BracketSide {
+  name: string; user_ids: number[]; score: number; result: string;
+}
+
+export interface BracketMatch {
+  id: number; round_number: number; bracket_position: number;
+  status: string; is_bye: boolean; scheduled_at: string;
+  next_match_id: number | null; next_match_slot: string;
+  side_a: BracketSide | null; side_b: BracketSide | null;
+  winner: string;
+}
+
+export interface BracketRound {
+  round_number: number; label: string; matches: BracketMatch[];
+}
+
+export interface BracketStage {
+  id: number; name: string; venue: TournamentVenueBrief | null;
+  location_name?: string; starts_at: string; ends_at: string;
+  rounds: BracketRound[];
+}
+
+export interface BracketData {
+  tournament_id: number; slug: string; status: string; format: string;
+  total_rounds: number; stages: BracketStage[];
+}
+
+export interface StaffParticipant {
+  user_id: number; username: string; name: string; phone: string;
+  team_name: string; roster: RosterEntry[]; seed_number: number;
+  payment_status: string; checked_in_at: string; checkin_code: string;
+  registered_at: string;
+}
+
+export interface SlotBlockRow {
+  stage_id: number; stage_name: string; listing_id: number; listing_title: string;
+  date: string; start_time: string; end_time: string; existing_bookings: number;
+}
+
+export interface TeamMember {
+  user_id: number; username: string; name: string; phone: string; role: string;
 }
 
 export interface Team {
   id: number; name: string; tag: string;
-  logo_url: string; city: string; is_active: boolean; member_count: number;
+  logo_url: string; city: string; is_active?: boolean;
+  leader_user_id?: number;
+  member_count: number;
+  members?: TeamMember[];
 }
 
 export interface NewsArticle {
@@ -245,17 +368,102 @@ export const ccApi = {
     return req<Tournament[]>(`/api/tournaments${qs ? `?${qs}` : ''}`);
   },
   tournament: (id: number) => req<Tournament>(`/api/tournaments/${id}`),
+  tournamentBySlug: (slug: string) =>
+    req<TournamentDetail>(`/api/tournaments/by-slug/${encodeURIComponent(slug)}`),
+  tournamentBracket: (id: number) => req<BracketData>(`/api/tournaments/${id}/bracket`),
   createTournament: (payload: object) =>
     req<Tournament>('/api/tournaments', { method: 'POST', body: JSON.stringify(payload) }),
   updateTournament: (id: number, payload: object) =>
     req<Tournament>(`/api/tournaments/${id}`, { method: 'PUT', body: JSON.stringify(payload) }),
-  registerTournament: (id: number, teamId = 0) =>
-    req<{ id: number; message: string }>(
-      `/api/tournaments/${id}/register${teamId ? `?team_id=${teamId}` : ''}`,
-      { method: 'POST' }
-    ),
+  registerTournament: (id: number, payload: RegisterPayload = {}) =>
+    req<{ id: number; message: string }>(`/api/tournaments/${id}/register`, {
+      method: 'POST', body: JSON.stringify(payload),
+    }),
+  withdrawTournament: (id: number) =>
+    req<{ message: string }>(`/api/tournaments/${id}/register`, { method: 'DELETE' }),
+  joinTournamentWaitlist: (id: number, payload: RegisterPayload = {}) =>
+    req<{ id: number; message: string }>(`/api/tournaments/${id}/waitlist`, {
+      method: 'POST', body: JSON.stringify(payload),
+    }),
+  leaveTournamentWaitlist: (id: number) =>
+    req<{ message: string }>(`/api/tournaments/${id}/waitlist`, { method: 'DELETE' }),
+  myTournamentRegistrations: () =>
+    req<MyTournamentRegistration[]>('/api/tournaments/my-registrations'),
   tournamentResults: (id: number, results: object[]) =>
     req<object[]>(`/api/tournaments/${id}/results`, { method: 'POST', body: JSON.stringify(results) }),
+
+  // Tournament management (staff portals)
+  adminTournaments: (statusFilter = '') =>
+    req<Tournament[]>(`/api/admin/tournaments${statusFilter ? `?status_filter=${statusFilter}` : ''}`),
+  assignedTournaments: () => req<Tournament[]>('/api/staff/assigned-tournaments'),
+  createVenueTournament: (payload: object) =>
+    req<Tournament>('/api/staff/venue-tournaments', { method: 'POST', body: JSON.stringify(payload) }),
+  submitTournamentForApproval: (id: number) =>
+    req<Tournament>(`/api/staff/tournaments/${id}/submit-for-approval`, { method: 'POST' }),
+  approveTournament: (id: number) =>
+    req<Tournament>(`/api/admin/tournaments/${id}/approve`, { method: 'POST' }),
+  rejectTournament: (id: number, reason = '') =>
+    req<Tournament>(`/api/admin/tournaments/${id}/reject`, {
+      method: 'POST', body: JSON.stringify({ reason }),
+    }),
+  cancelTournament: (id: number, reason = '') =>
+    req<Tournament>(`/api/admin/tournaments/${id}/cancel`, {
+      method: 'POST', body: JSON.stringify({ reason }),
+    }),
+  tournamentStages: (tournamentId: number) =>
+    req<TournamentStage[]>(`/api/admin/tournaments/${tournamentId}/stages`),
+  createStage: (tournamentId: number, payload: object) =>
+    req<TournamentStage>(`/api/admin/tournaments/${tournamentId}/stages`, {
+      method: 'POST', body: JSON.stringify(payload),
+    }),
+  updateStage: (stageId: number, payload: object) =>
+    req<TournamentStage>(`/api/admin/stages/${stageId}`, {
+      method: 'PUT', body: JSON.stringify(payload),
+    }),
+  deleteStage: (stageId: number) =>
+    req<{ message: string }>(`/api/admin/stages/${stageId}`, { method: 'DELETE' }),
+  generateBracket: (tournamentId: number, roundStageMap: Record<number, number> = {}) =>
+    req<BracketData>(`/api/admin/tournaments/${tournamentId}/generate-bracket`, {
+      method: 'POST', body: JSON.stringify({ round_stage_map: roundStageMap }),
+    }),
+  blockTournamentSlots: (tournamentId: number) =>
+    req<{ blocked: SlotBlockRow[]; conflicts: SlotBlockRow[] }>(
+      `/api/admin/tournaments/${tournamentId}/block-slots`, { method: 'POST' }
+    ),
+  staffTournamentParticipants: (tournamentId: number) =>
+    req<StaffParticipant[]>(`/api/staff/tournaments/${tournamentId}/participants`),
+  checkInParticipant: (tournamentId: number, payload: { code?: string; user_id?: number }) =>
+    req<{ message: string; user_id: number; checked_in_at: string }>(
+      `/api/staff/tournaments/${tournamentId}/check-in`,
+      { method: 'POST', body: JSON.stringify(payload) }
+    ),
+  remindCheckin: (tournamentId: number) =>
+    req<{ notified: number }>(`/api/staff/tournaments/${tournamentId}/remind-checkin`, { method: 'POST' }),
+  walkoverMatch: (matchId: number, winnerSide: 'A' | 'B', reason = '') =>
+    req<Match>(`/api/staff/matches/${matchId}/walkover`, {
+      method: 'POST', body: JSON.stringify({ winner_side: winnerSide, reason }),
+    }),
+  /** Fetches the registrations CSV (Bearer-authenticated) and triggers a download. */
+  downloadRegistrationsCsv: async (tournamentId: number, slug: string) => {
+    const token = localStorage.getItem('cc_token');
+    const res = await fetch(`${BASE}/api/staff/tournaments/${tournamentId}/registrations.csv`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
+    if (!res.ok) {
+      let detail = `HTTP ${res.status}`;
+      try { const b = await res.json(); detail = b.detail ?? detail; } catch { /* */ }
+      throw new ApiError(res.status, detail);
+    }
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${slug}-registrations.csv`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  },
 
   // Teams
   createTeam: (payload: object) =>

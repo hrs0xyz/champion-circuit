@@ -16,7 +16,9 @@ import { ForgotPasswordPage } from './pages/ForgotPasswordPage';
 import { TurfBrowsePage } from './pages/TurfBrowsePage';
 import { VenueDetailPage } from './pages/VenueDetailPage';
 import { EsportsBrowsePage } from './pages/EsportsBrowsePage';
-import { EsportsTournamentPage } from './pages/EsportsTournamentPage';
+import { TournamentsBrowsePage } from './pages/TournamentsBrowsePage';
+import { TournamentDetailPage } from './pages/TournamentDetailPage';
+import { LegacyTournamentRedirect } from './pages/LegacyTournamentRedirect';
 import { LeaderboardPage } from './pages/LeaderboardPage';
 import { VouchersPage } from './pages/VouchersPage';
 import { MyVoucherPage } from './pages/MyVoucherPage';
@@ -69,7 +71,10 @@ export default function App() {
                 <Route path="venue/:id" element={<VenueDetailPage />} />
 
                 <Route path="esports" element={<EsportsBrowsePage />} />
-                <Route path="esports/tournament/:id" element={<EsportsTournamentPage />} />
+                <Route path="tournaments" element={<TournamentsBrowsePage />} />
+                <Route path="tournaments/:slug" element={<TournamentDetailPage />} />
+                {/* Old links stay alive — resolves the id → canonical slug page */}
+                <Route path="esports/tournament/:id" element={<LegacyTournamentRedirect />} />
 
                 <Route
                   path="leaderboard"

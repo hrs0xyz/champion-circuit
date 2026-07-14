@@ -14,6 +14,7 @@ type NavItem = {
 const NAV_LINKS: readonly NavItem[] = [
   { to: '/turf', label: 'Turf' },
   { to: '/esports', label: 'Esports' },
+  { to: '/tournaments', label: 'Tournaments' },
   { to: '/vouchers', label: 'Shop' },
   { to: '/leaderboard', label: 'Leaderboard', requiresAuth: true },
   { to: '/news', label: 'News' },

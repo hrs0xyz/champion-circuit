@@ -1,9 +1,8 @@
 import { useEffect, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { CityBar } from '../components/ui/CityBar';
 import { ccApi, type Tournament } from '../lib/ccApi';
-import { ApiError } from '../lib/api';
 
 const TABS = ['all', 'registration', 'live', 'completed'] as const;
 type Tab = typeof TABS[number];
@@ -21,12 +20,9 @@ const STATUS_DOT: Record<string, string> = {
 
 export function EsportsBrowsePage() {
   const { user } = useAuth();
-  const navigate = useNavigate();
   const [tab, setTab] = useState<Tab>('all');
   const [tournaments, setTournaments] = useState<Tournament[]>([]);
   const [loading, setLoading] = useState(true);
-  const [registering, setRegistering] = useState<number | null>(null);
-  const [msg, setMsg] = useState<{ id: number; text: string; ok: boolean } | null>(null);
 
   useEffect(() => {
     setLoading(true);
@@ -35,25 +31,6 @@ export function EsportsBrowsePage() {
       .catch(() => setTournaments([]))
       .finally(() => setLoading(false));
   }, [tab]);
-
-  async function handleRegister(t: Tournament) {
-    if (!user) {
-      navigate(`/login?next=${encodeURIComponent('/esports')}`);
-      return;
-    }
-    setRegistering(t.id);
-    try {
-      await ccApi.registerTournament(t.id);
-      setMsg({ id: t.id, text: 'Registered!', ok: true });
-      // Refresh participant count
-      const updated = await ccApi.tournament(t.id);
-      setTournaments((prev) => prev.map((x) => x.id === t.id ? updated : x));
-    } catch (err) {
-      setMsg({ id: t.id, text: err instanceof ApiError ? err.message : 'Failed', ok: false });
-    } finally {
-      setRegistering(null);
-    }
-  }
 
   return (
     <section className="section section-esports">
@@ -74,7 +51,7 @@ export function EsportsBrowsePage() {
               role="tab"
               aria-selected={tab === t}
               className={`tab-btn${tab === t ? ' is-active' : ''}`}
-              onClick={() => { setTab(t); setMsg(null); }}
+              onClick={() => setTab(t)}
             >
               {TAB_LABELS[t]}
             </button>
@@ -117,7 +94,7 @@ export function EsportsBrowsePage() {
                   </div>
 
                   <h3 className="tournament-card-new__name">
-                    <Link to={`/esports/tournament/${t.id}`}>{t.name}</Link>
+                    <Link to={`/tournaments/${t.slug}`}>{t.name}</Link>
                   </h3>
 
                   <div className="tournament-card-new__meta">
@@ -140,23 +117,18 @@ export function EsportsBrowsePage() {
                     {t.entry_fee_paise > 0 ? (
                       <span className="tournament-card-new__fee">₹{t.entry_fee_paise / 100} entry</span>
                     ) : (
-                      <span className="tournament-card-new__free">Free entry</span>
+                      <span className="free-chip">FREE</span>
                     )}
 
-                    {msg?.id === t.id ? (
-                      <span className={msg.ok ? 'auth-success' : 'auth-error'} style={{ fontSize: 13, padding: '4px 10px' }}>
-                        {msg.text}
-                      </span>
-                    ) : t.registration_open ? (
-                      <button
-                        type="button"
-                        className="btn btn-primary btn-sm"
-                        disabled={registering === t.id}
-                        onClick={() => void handleRegister(t)}
-                      >
-                        {registering === t.id ? 'Registering…' : 'Register'}
-                      </button>
-                    ) : null}
+                    {t.registration_effectively_open ? (
+                      <Link className="btn btn-primary btn-sm" to={`/tournaments/${t.slug}`}>
+                        Register
+                      </Link>
+                    ) : (
+                      <Link className="muted small" to={`/tournaments/${t.slug}`}>
+                        View details →
+                      </Link>
+                    )}
                   </div>
                 </div>
               </div>

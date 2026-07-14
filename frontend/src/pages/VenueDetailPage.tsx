@@ -495,7 +495,7 @@ function ListingCard({ listing: l, venue, expandedListing, setExpandedListing, u
   user: { name?: string } | null;
   navigate: (path: string) => void;
   setShowInquiry: (v: boolean) => void;
-  track: (data: object) => void;
+  track: (data: import('../hooks/useActivity').ActivityPayload) => void;
 }) {
   const allPhotos = l.photos.length > 0
     ? l.photos.map((p) => imgSrc(p.url))

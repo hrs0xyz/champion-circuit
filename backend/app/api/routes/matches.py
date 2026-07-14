@@ -444,14 +444,27 @@ def my_teams(
     db: Session = Depends(get_db),
 ):
     teams = get_user_teams(db, current_user.id)
-    return [
-        {
+    out = []
+    for t in teams:
+        members = []
+        for m in t.members:
+            u = db.get(User, m.user_id)
+            if u:
+                members.append({
+                    "user_id": u.id,
+                    "username": u.username,
+                    "name": u.display_name or u.name or u.username,
+                    "phone": u.phone,
+                    "role": m.role,
+                })
+        out.append({
             "id": t.id, "name": t.name, "tag": t.tag,
             "city": t.city, "logo_url": t.logo_url,
+            "leader_user_id": t.leader_user_id,
             "member_count": len(t.members),
-        }
-        for t in teams
-    ]
+            "members": members,
+        })
+    return out
 
 
 @router.post("/teams/{team_id}/invite")
