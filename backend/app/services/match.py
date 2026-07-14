@@ -6,6 +6,7 @@ import re
 import secrets
 from datetime import datetime, timezone
 
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.models.match import (
@@ -51,7 +52,9 @@ PLACEMENT_POINTS = {1: 100, 2: 60, 3: 35, 5: 20}
 # ── Time helpers ──────────────────────────────────────────────────────────────
 
 def _iso_now() -> str:
-    return datetime.now(timezone.utc).isoformat()
+    # No microseconds: keeps the string within the VARCHAR(30) columns
+    # (Postgres enforces the length; "…T12:30:28+00:00" is 25 chars).
+    return datetime.now(timezone.utc).replace(microsecond=0).isoformat()
 
 
 def _deadline_passed(deadline: str) -> bool:
@@ -136,7 +139,6 @@ def create_match(db: Session, payload: MatchCreate, created_by_user_id: int) -> 
 
 def verify_match(db: Session, match_id: int, admin_user_id: int) -> Match:
     """Admin verifies a match — calculates and writes points."""
-    from datetime import datetime, timezone
     match = db.get(Match, match_id)
     if not match:
         raise ValueError("Match not found")
@@ -145,7 +147,8 @@ def verify_match(db: Session, match_id: int, admin_user_id: int) -> Match:
 
     match.status = "completed"
     match.verified_by_admin_id = admin_user_id
-    match.verified_at = datetime.now(timezone.utc).isoformat()
+    # _iso_now() has no microseconds — fits the VARCHAR(30) column on Postgres
+    match.verified_at = _iso_now()
 
     # Compute and write points for each participant
     for p in match.participants:
@@ -362,7 +365,11 @@ def _unique_tournament_slug(db: Session, base: str) -> str:
 
 def create_tournament(db: Session, payload: TournamentCreate, created_by: int) -> Tournament:
     slug = _unique_tournament_slug(db, payload.name)
-    t = Tournament(slug=slug, created_by=created_by, **payload.model_dump())
+    data = payload.model_dump()
+    # 0 means "none" in the API but would violate the FK on Postgres
+    data["venue_id"] = data.get("venue_id") or None
+    data["listing_id"] = data.get("listing_id") or None
+    t = Tournament(slug=slug, created_by=created_by, **data)
     db.add(t)
     db.commit()
     db.refresh(t)
@@ -373,11 +380,21 @@ def get_tournament(db: Session, tournament_id: int) -> Tournament | None:
     return db.get(Tournament, tournament_id)
 
 
+def get_tournament_by_slug(db: Session, slug: str) -> Tournament | None:
+    return db.query(Tournament).filter(Tournament.slug == slug).first()
+
+
+PUBLIC_TOURNAMENT_STATUSES = ("registration", "live", "completed")
+
+
 def list_tournaments(
     db: Session, status: str = "", game: str = "",
-    venue_id: int = 0, skip: int = 0, limit: int = 50
+    venue_id: int = 0, skip: int = 0, limit: int = 50,
+    public_only: bool = False,
 ) -> list[Tournament]:
     q = db.query(Tournament)
+    if public_only:
+        q = q.filter(Tournament.status.in_(PUBLIC_TOURNAMENT_STATUSES))
     if status:
         q = q.filter(Tournament.status == status)
     if game:
@@ -387,16 +404,153 @@ def list_tournaments(
     return q.order_by(Tournament.starts_at.desc()).offset(skip).limit(limit).all()
 
 
-def register_for_tournament(db: Session, tournament_id: int, user_id: int, team_id: int = 0) -> TournamentRegistration:
+# ── Tournament registration ───────────────────────────────────────────────────
+
+def _new_checkin_code(db: Session, tournament_id: int) -> str:
+    """Short uppercase code, unique within the tournament (used for QR check-in)."""
+    for _ in range(20):
+        code = secrets.token_hex(4).upper()
+        clash = db.query(TournamentRegistration).filter(
+            TournamentRegistration.tournament_id == tournament_id,
+            TournamentRegistration.checkin_code == code,
+        ).first()
+        if not clash:
+            return code
+    raise RuntimeError("Could not generate a unique check-in code")
+
+
+def _registration_count(db: Session, tournament_id: int) -> int:
+    return db.query(TournamentRegistration).filter(
+        TournamentRegistration.tournament_id == tournament_id
+    ).count()
+
+
+def _roster_user_ids(reg_or_entry) -> set[int]:
+    """User ids covered by a registration/waitlist row: the captain + roster."""
+    ids = {reg_or_entry.user_id}
+    try:
+        for member in json.loads(reg_or_entry.roster_json or "[]"):
+            uid = member.get("user_id")
+            if uid:
+                ids.add(int(uid))
+    except (ValueError, TypeError, AttributeError):
+        pass
+    return ids
+
+
+def _validate_registration_payload(
+    db: Session, t: Tournament, user: User, payload: TournamentRegisterPayload,
+) -> dict:
+    """
+    Shared validation for register + waitlist-join. Returns the normalized
+    column values for the row. Raises ValueError with a user-facing message.
+    """
+    contact_name = (payload.contact_name or user.name or user.username or "").strip()[:120]
+    contact_phone = (payload.contact_phone or user.phone or "").strip()[:20]
+    if not contact_phone:
+        raise ValueError("A contact phone number is required")
+
+    team_id = None
+    roster: list[dict] = []
+    if t.mode in ("duo", "squad", "team"):
+        if not payload.team_id:
+            raise ValueError("This is a team tournament — select your team to register")
+        team = db.get(Team, payload.team_id)
+        if not team or not team.is_active:
+            raise ValueError("Team not found")
+        if team.leader_user_id != user.id:
+            raise ValueError("Only the team captain can register the squad")
+        already = db.query(TournamentRegistration).filter(
+            TournamentRegistration.tournament_id == t.id,
+            TournamentRegistration.team_id == team.id,
+        ).first()
+        if already:
+            raise ValueError("This team is already registered")
+        if not payload.roster:
+            raise ValueError("Enter the name and phone number of every squad member")
+
+        member_ids = {m.user_id for m in team.members}
+        seen: set[int] = set()
+        for entry in payload.roster:
+            if entry.user_id not in member_ids:
+                raise ValueError("Every roster player must be a member of the selected team")
+            if entry.user_id in seen:
+                raise ValueError("Duplicate player in the roster")
+            if not entry.name.strip() or not entry.phone.strip():
+                raise ValueError("Every squad member needs a name and phone number")
+            seen.add(entry.user_id)
+
+        # A player may only appear in one squad per tournament
+        others = db.query(TournamentRegistration).filter(
+            TournamentRegistration.tournament_id == t.id
+        ).all()
+        roster_ids = seen | {user.id}
+        for other in others:
+            overlap = roster_ids & _roster_user_ids(other)
+            if overlap:
+                raise ValueError(
+                    "A player in this roster is already registered for this tournament with another entry"
+                )
+
+        team_id = team.id
+        roster = [
+            {"user_id": e.user_id, "name": e.name.strip()[:120], "phone": e.phone.strip()[:20]}
+            for e in payload.roster
+        ]
+
+    return {
+        "team_id": team_id,
+        "contact_name": contact_name,
+        "contact_phone": contact_phone,
+        "roster_json": json.dumps(roster),
+    }
+
+
+def _send_registration_email(db: Session, t: Tournament, user: User) -> None:
+    from app.services import email as email_service
+    venue = db.get(Venue, t.venue_id) if t.venue_id else None
+    email_service._send_async(
+        email_service.send_tournament_registration_email,
+        user.email,
+        user.display_name or user.name or user.username,
+        t.name,
+        t.slug,
+        _fmt_when(t.starts_at),
+        venue.name if venue else "",
+    )
+
+
+def _fmt_when(iso: str) -> str:
+    """Human-friendly rendering of an ISO-8601 string; raw value if unparseable."""
+    if not iso:
+        return ""
+    try:
+        dt = datetime.fromisoformat(iso)
+        return dt.strftime("%a %d %b %Y, %I:%M %p")
+    except ValueError:
+        return iso
+
+
+def register_for_tournament(
+    db: Session, tournament_id: int, user_id: int, payload: TournamentRegisterPayload,
+) -> TournamentRegistration:
+    from sqlalchemy.exc import IntegrityError
+
     t = db.get(Tournament, tournament_id)
     if not t:
         raise ValueError("Tournament not found")
-    if not t.registration_open:
+    if t.status != "registration" or not t.registration_open:
         raise ValueError("Registration is closed")
-    count = db.query(TournamentRegistration).filter(
-        TournamentRegistration.tournament_id == tournament_id
-    ).count()
-    if count >= t.max_participants:
+    if _deadline_passed(t.registration_deadline):
+        raise ValueError("Registration deadline has passed")
+
+    user = db.get(User, user_id)
+    if not user:
+        raise ValueError("User not found")
+
+    values = _validate_registration_payload(db, t, user, payload)
+
+    if _registration_count(db, tournament_id) >= t.max_participants:
         raise ValueError("Tournament is full")
     existing = db.query(TournamentRegistration).filter(
         TournamentRegistration.tournament_id == tournament_id,
@@ -408,17 +562,215 @@ def register_for_tournament(db: Session, tournament_id: int, user_id: int, team_
     reg = TournamentRegistration(
         tournament_id=tournament_id,
         user_id=user_id,
-        team_id=team_id or None,
         payment_status="paid" if t.entry_fee_paise == 0 else "unpaid",
+        checkin_code=_new_checkin_code(db, tournament_id),
+        **values,
     )
     db.add(reg)
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError:
+        # The unique constraint closes the two-tab / double-tap race
+        db.rollback()
+        raise ValueError("Already registered")
     db.refresh(reg)
-    _notify(db, user_id, "tournament_result",
+
+    _notify(db, user_id, "tournament_registration",
             f"Registered for {t.name}",
-            f"You've registered for {t.name}. Good luck!",
-            f"/esports/tournament/{tournament_id}")
+            f"You're in! {t.name} starts {_fmt_when(t.starts_at) or 'soon'}. Good luck!",
+            f"/tournaments/{t.slug}")
+    _send_registration_email(db, t, user)
     return reg
+
+
+def withdraw_from_tournament(db: Session, tournament_id: int, user_id: int) -> None:
+    t = db.get(Tournament, tournament_id)
+    if not t:
+        raise ValueError("Tournament not found")
+    reg = db.query(TournamentRegistration).filter(
+        TournamentRegistration.tournament_id == tournament_id,
+        TournamentRegistration.user_id == user_id,
+    ).first()
+    if not reg:
+        raise ValueError("You are not registered for this tournament")
+    if t.status != "registration":
+        raise ValueError("Withdrawal is closed — the tournament has started")
+    if _deadline_passed(t.registration_deadline):
+        raise ValueError("Withdrawal window has closed")
+
+    db.delete(reg)
+    db.commit()
+    _notify(db, user_id, "tournament_registration",
+            f"Withdrawn from {t.name}",
+            "Your registration has been withdrawn and your spot has been freed.",
+            f"/tournaments/{t.slug}")
+    promote_tournament_waitlist(db, t)
+
+
+# ── Tournament waitlist ───────────────────────────────────────────────────────
+
+def join_tournament_waitlist(
+    db: Session, tournament_id: int, user_id: int, payload: TournamentRegisterPayload,
+) -> TournamentWaitlistEntry:
+    t = db.get(Tournament, tournament_id)
+    if not t:
+        raise ValueError("Tournament not found")
+    if t.status != "registration" or not t.registration_open:
+        raise ValueError("Registration is closed")
+    if _deadline_passed(t.registration_deadline):
+        raise ValueError("Registration deadline has passed")
+    if _registration_count(db, tournament_id) < t.max_participants:
+        raise ValueError("Tournament is not full — register directly")
+    registered = db.query(TournamentRegistration).filter(
+        TournamentRegistration.tournament_id == tournament_id,
+        TournamentRegistration.user_id == user_id,
+    ).first()
+    if registered:
+        raise ValueError("Already registered")
+
+    user = db.get(User, user_id)
+    if not user:
+        raise ValueError("User not found")
+    values = _validate_registration_payload(db, t, user, payload)
+
+    entry = db.query(TournamentWaitlistEntry).filter(
+        TournamentWaitlistEntry.tournament_id == tournament_id,
+        TournamentWaitlistEntry.user_id == user_id,
+    ).first()
+    if entry:
+        if entry.status == "waiting":
+            raise ValueError("Already on the waitlist")
+        # Re-join: reuse the row (unique constraint), refresh the snapshot
+        entry.status = "waiting"
+        entry.promoted_at = ""
+        for key, val in values.items():
+            setattr(entry, key, val)
+    else:
+        entry = TournamentWaitlistEntry(
+            tournament_id=tournament_id, user_id=user_id, **values,
+        )
+        db.add(entry)
+    db.commit()
+    db.refresh(entry)
+    _notify(db, user_id, "tournament_registration",
+            f"On the waitlist for {t.name}",
+            "You'll be promoted automatically if a spot opens up before the deadline.",
+            f"/tournaments/{t.slug}")
+    return entry
+
+
+def leave_tournament_waitlist(db: Session, tournament_id: int, user_id: int) -> None:
+    entry = db.query(TournamentWaitlistEntry).filter(
+        TournamentWaitlistEntry.tournament_id == tournament_id,
+        TournamentWaitlistEntry.user_id == user_id,
+        TournamentWaitlistEntry.status == "waiting",
+    ).first()
+    if not entry:
+        raise ValueError("You are not on the waitlist")
+    entry.status = "left"
+    db.commit()
+
+
+def promote_tournament_waitlist(db: Session, t: Tournament) -> list[TournamentRegistration]:
+    """
+    Fill free seats from the waitlist (oldest first). No-op unless registration
+    is still open and the deadline hasn't passed. Safe to call after any
+    withdrawal or capacity change.
+    """
+    from sqlalchemy.exc import IntegrityError
+
+    promoted: list[TournamentRegistration] = []
+    if t.status != "registration" or _deadline_passed(t.registration_deadline):
+        return promoted
+
+    while _registration_count(db, t.id) < t.max_participants:
+        entry = (
+            db.query(TournamentWaitlistEntry)
+            .filter(
+                TournamentWaitlistEntry.tournament_id == t.id,
+                TournamentWaitlistEntry.status == "waiting",
+            )
+            .order_by(TournamentWaitlistEntry.created_at.asc(), TournamentWaitlistEntry.id.asc())
+            .first()
+        )
+        if not entry:
+            break
+
+        already = db.query(TournamentRegistration).filter(
+            TournamentRegistration.tournament_id == t.id,
+            TournamentRegistration.user_id == entry.user_id,
+        ).first()
+        if already:
+            # Registered through some other path meanwhile — drop from the queue
+            entry.status = "left"
+            db.commit()
+            continue
+
+        reg = TournamentRegistration(
+            tournament_id=t.id,
+            user_id=entry.user_id,
+            team_id=entry.team_id,
+            payment_status="paid" if t.entry_fee_paise == 0 else "unpaid",
+            checkin_code=_new_checkin_code(db, t.id),
+            contact_name=entry.contact_name,
+            contact_phone=entry.contact_phone,
+            roster_json=entry.roster_json,
+        )
+        db.add(reg)
+        entry.status = "promoted"
+        entry.promoted_at = _iso_now()
+        try:
+            db.commit()
+        except IntegrityError:
+            db.rollback()
+            entry.status = "left"
+            db.commit()
+            continue
+        db.refresh(reg)
+
+        _notify(db, entry.user_id, "tournament_registration",
+                f"A spot opened up — you're in {t.name}!",
+                "You've been promoted from the waitlist. Your registration is confirmed.",
+                f"/tournaments/{t.slug}")
+        user = db.get(User, entry.user_id)
+        if user:
+            _send_registration_email(db, t, user)
+        promoted.append(reg)
+
+    return promoted
+
+
+# ── Min-participants lazy auto-cancel (no background scheduler) ───────────────
+
+def maybe_auto_cancel(db: Session, t: Tournament) -> bool:
+    """
+    Cancel an under-subscribed tournament once its deadline has passed.
+    Called lazily from public detail / staff list / bracket generation.
+    """
+    if t.status != "registration" or t.min_participants <= 0:
+        return False
+    if not _deadline_passed(t.registration_deadline):
+        return False
+    paid = db.query(TournamentRegistration).filter(
+        TournamentRegistration.tournament_id == t.id,
+        TournamentRegistration.payment_status == "paid",
+    ).count()
+    if paid >= t.min_participants:
+        return False
+
+    t.status = "cancelled"
+    t.registration_open = False
+    db.commit()
+    regs = db.query(TournamentRegistration).filter(
+        TournamentRegistration.tournament_id == t.id
+    ).all()
+    for reg in regs:
+        _notify(db, reg.user_id, "tournament_registration",
+                f"{t.name} has been cancelled",
+                f"The tournament didn't reach the minimum of {t.min_participants} participants "
+                f"by the registration deadline.",
+                f"/tournaments/{t.slug}")
+    return True
 
 
 def record_tournament_result(
@@ -444,8 +796,51 @@ def record_tournament_result(
                 f"Tournament result recorded",
                 f"You finished #{payload.position} in {t.name if t else 'the tournament'}. "
                 f"You earned {earned} points.",
-                f"/esports/tournament/{payload.tournament_id}")
+                f"/tournaments/{t.slug}" if t else "/tournaments")
     return result
+
+
+def _serialize_venue_brief(db: Session, venue_id: int | None) -> dict | None:
+    if not venue_id:
+        return None
+    v = db.get(Venue, venue_id)
+    if not v:
+        return None
+    return {
+        "id": v.id,
+        "name": v.name,
+        "city": v.city,
+        "address_line1": v.address_line1,
+        "lat": v.lat,
+        "lng": v.lng,
+    }
+
+
+def serialize_stage(db: Session, s: TournamentStage) -> dict:
+    """Stage with its location resolved: venue → custom fields → online."""
+    venue = _serialize_venue_brief(db, s.venue_id)
+    if venue:
+        location_name, address, lat, lng = venue["name"], venue["address_line1"], venue["lat"], venue["lng"]
+    elif s.location_name or s.address:
+        location_name, address, lat, lng = s.location_name, s.address, s.lat, s.lng
+    else:
+        location_name, address, lat, lng = ("Online" if s.is_online else ""), "", "", ""
+    return {
+        "id": s.id,
+        "tournament_id": s.tournament_id,
+        "name": s.name,
+        "stage_order": s.stage_order,
+        "venue_id": s.venue_id,
+        "venue": venue,
+        "is_online": s.is_online,
+        "location_name": location_name,
+        "address": address,
+        "lat": lat,
+        "lng": lng,
+        "starts_at": s.starts_at,
+        "ends_at": s.ends_at,
+        "notes": s.notes,
+    }
 
 
 def serialize_tournament(t: Tournament, db: Session) -> dict:
@@ -462,6 +857,7 @@ def serialize_tournament(t: Tournament, db: Session) -> dict:
         "format": t.format,
         "mode": t.mode,
         "max_participants": t.max_participants,
+        "min_participants": t.min_participants,
         "entry_fee_paise": t.entry_fee_paise,
         "prize_pool_paise": t.prize_pool_paise,
         "prize_description": t.prize_description,
@@ -472,9 +868,189 @@ def serialize_tournament(t: Tournament, db: Session) -> dict:
         "status": t.status,
         "is_exclusive": t.is_exclusive,
         "is_featured": t.is_featured,
+        "awards_leaderboard_points": t.awards_leaderboard_points,
         "banner_url": t.banner_url,
         "participant_count": count,
+        "venue_id": t.venue_id,
+        "venue": _serialize_venue_brief(db, t.venue_id),
+        "registration_effectively_open": (
+            t.status == "registration"
+            and t.registration_open
+            and not _deadline_passed(t.registration_deadline)
+            and count < t.max_participants
+        ),
     }
+
+
+def _qr_svg(data: str) -> str:
+    """Inline SVG QR code (same pattern as the voucher service)."""
+    import io
+
+    import qrcode
+    import qrcode.image.svg
+
+    img = qrcode.make(data, image_factory=qrcode.image.svg.SvgPathImage, box_size=6, border=2)
+    buf = io.BytesIO()
+    img.save(buf)
+    return buf.getvalue().decode("utf-8")
+
+
+def _side_display_name(db: Session, match: Match, side: str) -> str:
+    """Public name for one side of a bracket match: team name, else captain's name."""
+    parts = [p for p in match.participants if p.team == side]
+    if not parts:
+        return ""
+    captain = next((p for p in parts if p.role == "captain"), parts[0])
+    reg = db.query(TournamentRegistration).filter(
+        TournamentRegistration.tournament_id == match.tournament_id,
+        TournamentRegistration.user_id == captain.user_id,
+    ).first()
+    if reg and reg.team_id:
+        team = db.get(Team, reg.team_id)
+        if team:
+            return team.name
+    u = db.get(User, captain.user_id)
+    if not u:
+        return ""
+    return u.display_name or u.name or u.username
+
+
+def _match_venue_name(db: Session, match: Match) -> str:
+    if match.stage_id:
+        stage = db.get(TournamentStage, match.stage_id)
+        if stage:
+            if stage.venue_id:
+                v = db.get(Venue, stage.venue_id)
+                if v:
+                    return v.name
+            if stage.location_name:
+                return stage.location_name
+            if stage.is_online:
+                return "Online"
+    if match.venue_id:
+        v = db.get(Venue, match.venue_id)
+        if v:
+            return v.name
+    return ""
+
+
+def serialize_my_registration(db: Session, reg: TournamentRegistration) -> dict:
+    """A user's own registration: check-in QR + their next fixture."""
+    try:
+        roster = json.loads(reg.roster_json or "[]")
+    except ValueError:
+        roster = []
+
+    team_name = ""
+    if reg.team_id:
+        team = db.get(Team, reg.team_id)
+        if team:
+            team_name = team.name
+
+    next_match = None
+    total_rounds = (
+        db.query(func.max(Match.round_number))
+        .filter(Match.tournament_id == reg.tournament_id, Match.round_number > 0)
+        .scalar()
+        or 0
+    )
+    if total_rounds:
+        m = (
+            db.query(Match)
+            .join(MatchParticipant, MatchParticipant.match_id == Match.id)
+            .filter(
+                Match.tournament_id == reg.tournament_id,
+                Match.round_number > 0,
+                Match.status.in_(("scheduled", "live")),
+                MatchParticipant.user_id == reg.user_id,
+            )
+            .order_by(Match.round_number.asc(), Match.bracket_position.asc())
+            .first()
+        )
+        if m:
+            my_side = next(
+                (p.team for p in m.participants if p.user_id == reg.user_id), ""
+            )
+            opponent_side = "B" if my_side == "A" else "A"
+            next_match = {
+                "id": m.id,
+                "round_number": m.round_number,
+                "round_of": 2 ** (total_rounds - m.round_number + 1),
+                "total_rounds": total_rounds,
+                "status": m.status,
+                "scheduled_at": m.scheduled_at,
+                "opponent_name": _side_display_name(db, m, opponent_side) or "TBD",
+                "venue_name": _match_venue_name(db, m),
+            }
+
+    return {
+        "id": reg.id,
+        "tournament_id": reg.tournament_id,
+        "user_id": reg.user_id,
+        "team_id": reg.team_id,
+        "team_name": team_name,
+        "payment_status": reg.payment_status,
+        "seed_number": reg.seed_number,
+        "checked_in_at": reg.checked_in_at,
+        "checkin_code": reg.checkin_code,
+        "contact_name": reg.contact_name,
+        "contact_phone": reg.contact_phone,
+        "roster": roster,
+        "registered_at": reg.registered_at,
+        "qr_svg": _qr_svg(f"CCT|{reg.tournament_id}|{reg.checkin_code}") if reg.checkin_code else "",
+        "next_match": next_match,
+    }
+
+
+def serialize_tournament_detail(t: Tournament, db: Session) -> dict:
+    """Everything the public detail page needs: stages, participants, podium."""
+    data = serialize_tournament(t, db)
+
+    data["stages"] = [serialize_stage(db, s) for s in t.stages]
+
+    participants = []
+    regs = (
+        db.query(TournamentRegistration)
+        .filter(TournamentRegistration.tournament_id == t.id)
+        .order_by(TournamentRegistration.registered_at.asc())
+        .all()
+    )
+    for reg in regs:
+        u = db.get(User, reg.user_id)
+        if not u:
+            continue
+        team_name = ""
+        if reg.team_id:
+            team = db.get(Team, reg.team_id)
+            if team:
+                team_name = team.name
+        participants.append({
+            "user_id": u.id,
+            "username": u.username,
+            "name": u.display_name or u.name or u.username,
+            "avatar_url": u.avatar_url,
+            "team_name": team_name,
+            "seed_number": reg.seed_number,
+            "checked_in": bool(reg.checked_in_at),
+        })
+    data["participants"] = participants
+
+    results = []
+    for res in sorted(t.results, key=lambda r: r.position):
+        u = db.get(User, res.user_id) if res.user_id else None
+        team = db.get(Team, res.team_id) if res.team_id else None
+        results.append({
+            "position": res.position,
+            "user_id": res.user_id,
+            "username": u.username if u else "",
+            "name": (u.display_name or u.name or u.username) if u else "",
+            "team_name": team.name if team else "",
+            "points_earned": res.points_earned,
+            "prize_won_paise": res.prize_won_paise,
+        })
+    data["results"] = results
+
+    return data
 
 
 # ── Teams ─────────────────────────────────────────────────────────────────────

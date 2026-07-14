@@ -1,7 +1,24 @@
 from email.message import EmailMessage
 import smtplib
+import threading
 import traceback
 from app.core.config import settings
+
+SITE_URL = "https://championcircuit.com"
+
+
+def _send_async(fn, *args, **kwargs) -> None:
+    """
+    Fire-and-forget email send on a daemon thread. Email must never block or
+    fail the request that triggered it — any exception is logged and swallowed.
+    """
+    def _run():
+        try:
+            fn(*args, **kwargs)
+        except Exception as exc:  # noqa: BLE001 — email is best-effort by design
+            print(f"[EMAIL ERROR] async {getattr(fn, '__name__', fn)} failed: {exc}")
+
+    threading.Thread(target=_run, daemon=True).start()
 
 
 def send_otp_email(to_email: str, otp: str, purpose: str) -> bool:
@@ -373,4 +390,156 @@ def send_welcome_email(to_email: str, username: str, name: str = "") -> bool:
         traceback.print_exc()
         print("=" * 80)
 
-        print(f"[EMAIL ERROR] Failed to send {purpose} OTP to {to_email}: {exc}")
+        print(f"[EMAIL ERROR] Failed to send welcome email to {to_email}: {exc}")
+        return False
+
+
+# ── Tournament emails ─────────────────────────────────────────────────────────
+#
+# One shared dark-theme layout (same visual language as send_welcome_email),
+# parameterised by heading / intro / detail rows / CTA. All senders follow the
+# project convention: no SMTP config → print a [DEV …] line and return False;
+# SMTP errors are caught, logged, and never raised.
+
+def _send_tournament_email(
+    to_email: str,
+    subject: str,
+    heading: str,
+    intro: str,
+    rows: list[tuple[str, str]],
+    cta_label: str,
+    cta_url: str,
+    dev_tag: str,
+) -> bool:
+    if not settings.SMTP_HOST or not settings.SMTP_USERNAME or not settings.SMTP_PASSWORD:
+        detail = " | ".join(f"{k}: {v}" for k, v in rows if v)
+        print(f"[DEV {dev_tag}] to {to_email} — {heading} — {detail} — {cta_url}")
+        return False
+
+    plain = f"{heading}\n\n{intro}\n\n"
+    for label, value in rows:
+        if value:
+            plain += f"  {label}: {value}\n"
+    plain += f"\n{cta_label}: {cta_url}\n\n— Champion Circuit\nofficial@championcircuit.com"
+
+    row_html = "".join(
+        f"""
+          <tr><td style="height:8px;"></td></tr>
+          <tr>
+            <td style="padding:10px 16px;background:rgba(10,191,188,0.06);border:1px solid rgba(10,191,188,0.15);border-radius:10px;">
+              <p style="margin:0;font-size:14px;color:#e8f4f4;"><strong>{label}</strong> — {value}</p>
+            </td>
+          </tr>
+        """
+        for label, value in rows if value
+    )
+
+    html = f"""
+<!DOCTYPE html>
+<html>
+<body style="margin:0;padding:0;background:#060d1a;font-family:'DM Sans',system-ui,sans-serif;color:#e8f4f4;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;margin:40px auto;">
+    <tr>
+      <td style="background:#0a1628;border:1px solid rgba(10,191,188,0.2);border-radius:16px 16px 0 0;padding:28px 32px 24px;text-align:center;border-bottom:none;">
+        <p style="margin:0;font-size:13px;font-weight:700;letter-spacing:0.18em;text-transform:uppercase;color:#0abfbc;">CHAMPION CIRCUIT</p>
+      </td>
+    </tr>
+    <tr>
+      <td style="background:#0a1628;border-left:1px solid rgba(10,191,188,0.2);border-right:1px solid rgba(10,191,188,0.2);padding:36px 32px 28px;">
+        <p style="margin:0 0 10px;font-size:26px;font-weight:800;color:#ffffff;line-height:1.25;">{heading}</p>
+        <p style="margin:0 0 20px;font-size:15px;color:rgba(232,244,244,0.65);line-height:1.7;">{intro}</p>
+        <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:28px;">
+          {row_html}
+        </table>
+        <table width="100%" cellpadding="0" cellspacing="0">
+          <tr>
+            <td style="text-align:center;">
+              <a href="{cta_url}"
+                 style="display:inline-block;background:#0abfbc;color:#060d1a;font-weight:700;font-size:15px;padding:14px 32px;border-radius:10px;text-decoration:none;letter-spacing:0.02em;">
+                {cta_label} →
+              </a>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+    <tr>
+      <td style="background:#060d1a;border:1px solid rgba(10,191,188,0.2);border-top:none;border-radius:0 0 16px 16px;padding:18px 32px;">
+        <p style="margin:0;font-size:12px;color:rgba(232,244,244,0.35);line-height:1.6;">
+          &copy; 2026 Champion Circuit Private Limited &nbsp;·&nbsp;
+          <a href="mailto:official@championcircuit.com" style="color:rgba(232,244,244,0.5);text-decoration:none;">official@championcircuit.com</a>
+        </p>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+"""
+
+    message = EmailMessage()
+    message["Subject"] = subject
+    message["From"] = f"Champion Circuit <{settings.SMTP_FROM_EMAIL or settings.SMTP_USERNAME}>"
+    message["To"] = to_email
+    message.set_content(plain)
+    message.add_alternative(html, subtype="html")
+
+    try:
+        with smtplib.SMTP(settings.SMTP_HOST, settings.SMTP_PORT) as smtp:
+            smtp.ehlo()
+            smtp.starttls()
+            smtp.ehlo()
+            smtp.login(settings.SMTP_USERNAME, settings.SMTP_PASSWORD)
+            smtp.send_message(message)
+        return True
+    except Exception as exc:
+        print(f"[EMAIL ERROR] {dev_tag} to {to_email}: {exc}")
+        return False
+
+
+def send_tournament_registration_email(
+    to_email: str, display: str, tournament_name: str, slug: str,
+    when: str = "", venue_name: str = "",
+) -> bool:
+    return _send_tournament_email(
+        to_email,
+        subject=f"You're registered — {tournament_name}",
+        heading=f"You're in, {display}! 🏆",
+        intro=f"Your spot in <strong>{tournament_name}</strong> is confirmed. "
+              f"Keep an eye on your notifications — we'll ping you when the bracket drops.",
+        rows=[("Starts", when), ("Venue", venue_name)],
+        cta_label="View tournament",
+        cta_url=f"{SITE_URL}/tournaments/{slug}",
+        dev_tag="TOURNAMENT REG",
+    )
+
+
+def send_bracket_published_email(
+    to_email: str, display: str, tournament_name: str, slug: str,
+) -> bool:
+    return _send_tournament_email(
+        to_email,
+        subject=f"The bracket is live — {tournament_name}",
+        heading="The bracket is live! ⚔️",
+        intro=f"{display}, the bracket for <strong>{tournament_name}</strong> has been published. "
+              f"Find your first match and get ready.",
+        rows=[],
+        cta_label="View bracket",
+        cta_url=f"{SITE_URL}/tournaments/{slug}",
+        dev_tag="BRACKET",
+    )
+
+
+def send_fixture_email(
+    to_email: str, display: str, tournament_name: str, slug: str,
+    round_label: str, when: str = "", venue_name: str = "", opponent: str = "",
+) -> bool:
+    return _send_tournament_email(
+        to_email,
+        subject=f"Your {round_label} is set — {tournament_name}",
+        heading=f"Your {round_label} is set 🎯",
+        intro=f"{display}, your next fixture in <strong>{tournament_name}</strong> is confirmed.",
+        rows=[("Opponent", opponent), ("When", when), ("Where", venue_name)],
+        cta_label="View bracket",
+        cta_url=f"{SITE_URL}/tournaments/{slug}",
+        dev_tag="FIXTURE",
+    )
