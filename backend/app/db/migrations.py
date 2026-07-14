@@ -10,6 +10,43 @@ def _add_column(connection, table: str, column: str, definition: str) -> None:
     connection.execute(text(f"ALTER TABLE {table} ADD COLUMN {column} {definition}"))
 
 
+# Tournament-feature columns added to pre-existing tables. New tables
+# (tournament_stages, tournament_waitlist) come from Base.metadata.create_all,
+# which main.py runs *before* ensure_dev_schema() — so FK targets always exist
+# by the time these ALTERs run.
+_MATCH_BRACKET_COLS = {
+    "stage_id":         "INTEGER REFERENCES tournament_stages(id) ON DELETE SET NULL",
+    "round_number":     "INTEGER DEFAULT 0 NOT NULL",
+    "bracket_position": "INTEGER DEFAULT 0 NOT NULL",
+    "next_match_id":    "INTEGER REFERENCES matches(id) ON DELETE SET NULL",
+    "next_match_slot":  "VARCHAR(1) DEFAULT '' NOT NULL",
+    "is_bye":           "BOOLEAN DEFAULT FALSE NOT NULL",
+    "scheduled_at":     "VARCHAR(30) DEFAULT '' NOT NULL",
+}
+
+_TOURNAMENT_NEW_COLS = {
+    "min_participants":          "INTEGER DEFAULT 0 NOT NULL",
+    "awards_leaderboard_points": "BOOLEAN DEFAULT TRUE NOT NULL",
+}
+
+_REGISTRATION_NEW_COLS = {
+    "checked_in_at": "VARCHAR(30) DEFAULT '' NOT NULL",
+    "checkin_code":  "VARCHAR(12) DEFAULT '' NOT NULL",
+    "contact_name":  "VARCHAR(120) DEFAULT '' NOT NULL",
+    "contact_phone": "VARCHAR(20) DEFAULT '' NOT NULL",
+    "roster_json":   "TEXT DEFAULT '[]' NOT NULL",
+}
+
+
+def _sqlite_defn(defn: str) -> str:
+    """SQLite has no BOOLEAN/TRUE/FALSE literals — map to INTEGER 0/1."""
+    return (
+        defn.replace("BOOLEAN", "INTEGER")
+            .replace("DEFAULT TRUE", "DEFAULT 1")
+            .replace("DEFAULT FALSE", "DEFAULT 0")
+    )
+
+
 def _ensure_postgres_schema() -> None:
     """
     Lightweight idempotent migrations for Postgres (this project doesn't use
@@ -92,6 +129,43 @@ def _ensure_postgres_schema() -> None:
                         f"ALTER TABLE news_articles ALTER COLUMN {col_name} "
                         f"TYPE {new_type} USING {cast}"
                     ))
+
+        # ── Tournament feature: bracket fields + registration hardening ────────
+        if "matches" in tables:
+            existing = {c["name"] for c in inspector.get_columns("matches")}
+            for col, defn in _MATCH_BRACKET_COLS.items():
+                if col not in existing:
+                    conn.execute(text(f"ALTER TABLE matches ADD COLUMN IF NOT EXISTS {col} {defn}"))
+            conn.execute(text(
+                "CREATE INDEX IF NOT EXISTS ix_matches_stage_id ON matches(stage_id)"
+            ))
+
+        if "tournaments" in tables:
+            existing = {c["name"] for c in inspector.get_columns("tournaments")}
+            for col, defn in _TOURNAMENT_NEW_COLS.items():
+                if col not in existing:
+                    conn.execute(text(f"ALTER TABLE tournaments ADD COLUMN IF NOT EXISTS {col} {defn}"))
+
+        if "tournament_registrations" in tables:
+            existing = {c["name"] for c in inspector.get_columns("tournament_registrations")}
+            for col, defn in _REGISTRATION_NEW_COLS.items():
+                if col not in existing:
+                    conn.execute(text(
+                        f"ALTER TABLE tournament_registrations ADD COLUMN IF NOT EXISTS {col} {defn}"
+                    ))
+            conn.execute(text(
+                "CREATE INDEX IF NOT EXISTS ix_tournament_registrations_checkin_code "
+                "ON tournament_registrations(checkin_code)"
+            ))
+            # De-dupe (keep the earliest row) before enforcing uniqueness.
+            conn.execute(text(
+                "DELETE FROM tournament_registrations a USING tournament_registrations b "
+                "WHERE a.id > b.id AND a.tournament_id = b.tournament_id AND a.user_id = b.user_id"
+            ))
+            conn.execute(text(
+                "CREATE UNIQUE INDEX IF NOT EXISTS uq_tournament_registration_user "
+                "ON tournament_registrations(tournament_id, user_id)"
+            ))
 
 
 def ensure_dev_schema() -> None:
@@ -202,3 +276,38 @@ def ensure_dev_schema() -> None:
                 )
             """))
             conn.execute(text("CREATE INDEX ix_venue_cover_photos_venue_id ON venue_cover_photos(venue_id)"))
+
+        # ── Tournament feature: bracket fields + registration hardening ────────
+        if "matches" in tables:
+            match_cols = {c["name"] for c in inspector.get_columns("matches")}
+            for col, defn in _MATCH_BRACKET_COLS.items():
+                if col not in match_cols:
+                    _add_column(conn, "matches", col, _sqlite_defn(defn))
+            conn.execute(text(
+                "CREATE INDEX IF NOT EXISTS ix_matches_stage_id ON matches(stage_id)"
+            ))
+
+        if "tournaments" in tables:
+            t_cols = {c["name"] for c in inspector.get_columns("tournaments")}
+            for col, defn in _TOURNAMENT_NEW_COLS.items():
+                if col not in t_cols:
+                    _add_column(conn, "tournaments", col, _sqlite_defn(defn))
+
+        if "tournament_registrations" in tables:
+            reg_cols = {c["name"] for c in inspector.get_columns("tournament_registrations")}
+            for col, defn in _REGISTRATION_NEW_COLS.items():
+                if col not in reg_cols:
+                    _add_column(conn, "tournament_registrations", col, _sqlite_defn(defn))
+            conn.execute(text(
+                "CREATE INDEX IF NOT EXISTS ix_tournament_registrations_checkin_code "
+                "ON tournament_registrations(checkin_code)"
+            ))
+            # De-dupe (keep the earliest row) before enforcing uniqueness.
+            conn.execute(text(
+                "DELETE FROM tournament_registrations WHERE id NOT IN "
+                "(SELECT MIN(id) FROM tournament_registrations GROUP BY tournament_id, user_id)"
+            ))
+            conn.execute(text(
+                "CREATE UNIQUE INDEX IF NOT EXISTS uq_tournament_registration_user "
+                "ON tournament_registrations(tournament_id, user_id)"
+            ))

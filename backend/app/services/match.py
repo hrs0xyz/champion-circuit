@@ -1,19 +1,26 @@
 """
 Match recording, scoring, leaderboard, tournament, team service.
 """
+import json
 import re
+import secrets
+from datetime import datetime, timezone
+
 from sqlalchemy.orm import Session
 
 from app.models.match import (
     LeaderboardSnapshot, Match, MatchParticipant,
     NewsArticle, Notification, ScoreAdjustment,
     Team, TeamInvite, TeamMember, Tournament,
-    TournamentRegistration, TournamentResult,
+    TournamentAdmin, TournamentRegistration, TournamentResult,
+    TournamentStage, TournamentWaitlistEntry,
 )
 from app.models.user import User
+from app.models.venue import Venue
 from app.schemas.match import (
     MatchCreate, NewsCreate, ScoreAdjustmentCreate,
-    TeamCreate, TournamentCreate, TournamentResultCreate,
+    TeamCreate, TournamentCreate, TournamentRegisterPayload,
+    TournamentResultCreate,
 )
 
 
@@ -35,6 +42,33 @@ MULTIPLIERS = {
     "tournament": 1.5,
     "verified_venue": 1.2,
 }
+
+# Finish-position leaderboard points for knockout tournaments
+# (position → points; 5 = quarter-final losers).
+PLACEMENT_POINTS = {1: 100, 2: 60, 3: 35, 5: 20}
+
+
+# ── Time helpers ──────────────────────────────────────────────────────────────
+
+def _iso_now() -> str:
+    return datetime.now(timezone.utc).isoformat()
+
+
+def _deadline_passed(deadline: str) -> bool:
+    """
+    True if the ISO-8601 deadline string is in the past. Empty → never passes.
+    Naive datetimes are assumed UTC; unparseable values fall back to
+    lexicographic comparison (chronological for well-formed ISO strings).
+    """
+    if not deadline:
+        return False
+    try:
+        dl = datetime.fromisoformat(deadline)
+        if dl.tzinfo is None:
+            dl = dl.replace(tzinfo=timezone.utc)
+        return datetime.now(timezone.utc) > dl
+    except ValueError:
+        return _iso_now() > deadline
 
 
 def calculate_points(result: str, match_type: str, is_verified_venue: bool = False) -> int:

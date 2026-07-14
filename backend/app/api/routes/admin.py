@@ -38,7 +38,7 @@ from app.core.security import hash_password
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_current_user
+from app.api.deps import get_current_user, is_tournament_admin, require_tournament_manage_access
 from app.db.session import get_db
 from app.models.match import Match, MatchParticipant, Tournament, TournamentAdmin, TournamentRegistration
 from app.models.user import User
@@ -57,34 +57,6 @@ def _require_admin(user: User) -> None:
 def _require_venue_staff(user: User) -> None:
     if not user.is_venue_owner and not user.is_admin:
         raise HTTPException(status_code=403, detail="Venue owner access required")
-
-
-def _is_tournament_admin(db: Session, user: User, tournament_id: int) -> bool:
-    """Returns True if user is super admin or assigned match admin for this tournament."""
-    if user.is_admin:
-        return True
-    return db.query(TournamentAdmin).filter(
-        TournamentAdmin.tournament_id == tournament_id,
-        TournamentAdmin.user_id == user.id,
-    ).first() is not None
-
-
-def _require_tournament_manage_access(db: Session, user: User, tournament_id: int) -> Tournament:
-    """
-    Gate for managing a tournament's match admins.
-    Super admin: any tournament. Venue owner: only tournaments at their own venue.
-    Returns the tournament or raises 403/404.
-    """
-    if not user.is_admin and not user.is_venue_owner:
-        raise HTTPException(status_code=403, detail="Not authorised")
-    t = db.get(Tournament, tournament_id)
-    if not t:
-        raise HTTPException(status_code=404, detail="Tournament not found")
-    if not user.is_admin:
-        my_venue = get_user_venue(db, user.id)
-        if not my_venue or t.venue_id != my_venue.id:
-            raise HTTPException(status_code=403, detail="You can only manage your own tournaments")
-    return t
 
 
 # ── Super Admin — Users ───────────────────────────────────────────────────────
@@ -250,7 +222,7 @@ def assign_match_admin(
     db: Session = Depends(get_db),
 ):
     """Assign a user as match admin for a tournament. Super admin or venue owner can do this."""
-    _require_tournament_manage_access(db, current_user, tournament_id)
+    require_tournament_manage_access(db, current_user, tournament_id)
 
     username = payload.get("username", "")
     from app.services.users import get_user_by_username
@@ -283,7 +255,7 @@ def remove_match_admin(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    _require_tournament_manage_access(db, current_user, tournament_id)
+    require_tournament_manage_access(db, current_user, tournament_id)
     ta = db.query(TournamentAdmin).filter(
         TournamentAdmin.tournament_id == tournament_id,
         TournamentAdmin.user_id == user_id,
@@ -301,7 +273,7 @@ def list_tournament_admins(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    _require_tournament_manage_access(db, current_user, tournament_id)
+    require_tournament_manage_access(db, current_user, tournament_id)
     admins = db.query(TournamentAdmin).filter(
         TournamentAdmin.tournament_id == tournament_id
     ).all()
@@ -369,7 +341,7 @@ def tournament_participants(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    if not _is_tournament_admin(db, current_user, tournament_id):
+    if not is_tournament_admin(db, current_user, tournament_id):
         raise HTTPException(status_code=403, detail="Not assigned to this tournament")
     regs = db.query(TournamentRegistration).filter(
         TournamentRegistration.tournament_id == tournament_id
@@ -391,7 +363,7 @@ def tournament_matches(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    if not _is_tournament_admin(db, current_user, tournament_id):
+    if not is_tournament_admin(db, current_user, tournament_id):
         raise HTTPException(status_code=403, detail="Not assigned to this tournament")
     matches = db.query(Match).filter(Match.tournament_id == tournament_id).all()
     return [serialize_match(m) for m in matches]
@@ -408,7 +380,7 @@ def edit_match(
     match = db.get(Match, match_id)
     if not match:
         raise HTTPException(status_code=404, detail="Match not found")
-    if not _is_tournament_admin(db, current_user, match.tournament_id or 0) and not current_user.is_admin:
+    if not is_tournament_admin(db, current_user, match.tournament_id or 0) and not current_user.is_admin:
         raise HTTPException(status_code=403, detail="Not authorised to edit this match")
 
     # Update match fields
@@ -442,7 +414,7 @@ def staff_verify_match(
     match = db.get(Match, match_id)
     if not match:
         raise HTTPException(status_code=404, detail="Match not found")
-    if not _is_tournament_admin(db, current_user, match.tournament_id or 0) and not current_user.is_admin:
+    if not is_tournament_admin(db, current_user, match.tournament_id or 0) and not current_user.is_admin:
         raise HTTPException(status_code=403, detail="Not authorised")
     try:
         match = verify_match(db, match_id, current_user.id)

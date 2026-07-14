@@ -90,6 +90,7 @@ class TournamentCreate(BaseModel):
     format: str = Field(default="knockout", max_length=30)
     mode: str = Field(default="solo", max_length=20)
     max_participants: int = Field(default=16, ge=2)
+    min_participants: int = Field(default=0, ge=0)
     entry_fee_paise: int = Field(default=0, ge=0)
     prize_pool_paise: int = Field(default=0, ge=0)
     prize_description: str = Field(default="", max_length=1000)
@@ -99,7 +100,92 @@ class TournamentCreate(BaseModel):
     ends_at: str = Field(default="", max_length=30)
     is_exclusive: bool = False
     is_featured: bool = False
+    awards_leaderboard_points: bool = True
     banner_url: str = Field(default="", max_length=500)
+
+
+class TournamentUpdate(BaseModel):
+    """Partial update — every field optional; used with exclude_unset=True."""
+    name: Optional[str] = Field(default=None, min_length=2, max_length=200)
+    venue_id: Optional[int] = None
+    listing_id: Optional[int] = None
+    description: Optional[str] = Field(default=None, max_length=3000)
+    rules: Optional[str] = Field(default=None, max_length=3000)
+    game: Optional[str] = Field(default=None, max_length=60)
+    format: Optional[str] = Field(default=None, max_length=30)
+    mode: Optional[str] = Field(default=None, max_length=20)
+    max_participants: Optional[int] = Field(default=None, ge=2)
+    min_participants: Optional[int] = Field(default=None, ge=0)
+    entry_fee_paise: Optional[int] = Field(default=None, ge=0)
+    prize_pool_paise: Optional[int] = Field(default=None, ge=0)
+    prize_description: Optional[str] = Field(default=None, max_length=1000)
+    registration_open: Optional[bool] = None
+    registration_deadline: Optional[str] = Field(default=None, max_length=30)
+    starts_at: Optional[str] = Field(default=None, max_length=30)
+    ends_at: Optional[str] = Field(default=None, max_length=30)
+    status: Optional[str] = Field(default=None, max_length=20)
+    is_exclusive: Optional[bool] = None
+    is_featured: Optional[bool] = None
+    awards_leaderboard_points: Optional[bool] = None
+    banner_url: Optional[str] = Field(default=None, max_length=500)
+
+
+class StageCreate(BaseModel):
+    name: str = Field(min_length=2, max_length=120)
+    stage_order: int = Field(default=1, ge=1)
+    venue_id: int = 0
+    is_online: bool = False
+    location_name: str = Field(default="", max_length=200)
+    address: str = Field(default="", max_length=500)
+    lat: str = Field(default="", max_length=20)
+    lng: str = Field(default="", max_length=20)
+    starts_at: str = Field(default="", max_length=30)
+    ends_at: str = Field(default="", max_length=30)
+    notes: str = Field(default="", max_length=2000)
+
+
+class StageUpdate(BaseModel):
+    """Partial stage update — used with exclude_unset=True."""
+    name: Optional[str] = Field(default=None, min_length=2, max_length=120)
+    stage_order: Optional[int] = Field(default=None, ge=1)
+    venue_id: Optional[int] = None
+    is_online: Optional[bool] = None
+    location_name: Optional[str] = Field(default=None, max_length=200)
+    address: Optional[str] = Field(default=None, max_length=500)
+    lat: Optional[str] = Field(default=None, max_length=20)
+    lng: Optional[str] = Field(default=None, max_length=20)
+    starts_at: Optional[str] = Field(default=None, max_length=30)
+    ends_at: Optional[str] = Field(default=None, max_length=30)
+    notes: Optional[str] = Field(default=None, max_length=2000)
+
+
+class RosterEntry(BaseModel):
+    user_id: int
+    name: str = Field(min_length=1, max_length=120)
+    phone: str = Field(min_length=1, max_length=20)
+
+
+class TournamentRegisterPayload(BaseModel):
+    team_id: int = 0
+    contact_name: str = Field(default="", max_length=120)
+    contact_phone: str = Field(default="", max_length=20)
+    roster: List[RosterEntry] = Field(default_factory=list)
+
+
+class GenerateBracketPayload(BaseModel):
+    # round_number → stage_id; unmapped rounds fall back to proportional
+    # distribution across the tournament's stages (in stage_order).
+    round_stage_map: dict[int, int] = Field(default_factory=dict)
+
+
+class WalkoverPayload(BaseModel):
+    winner_side: str = Field(pattern="^[AB]$")
+    reason: str = Field(default="", max_length=300)
+
+
+class CheckInPayload(BaseModel):
+    code: str = Field(default="", max_length=40)
+    user_id: int = 0
 
 
 class TournamentRead(BaseModel):
