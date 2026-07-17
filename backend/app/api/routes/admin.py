@@ -603,10 +603,16 @@ def edit_match(
             detail="This bracket match is verified — its result has already advanced",
         )
 
-    # Update match fields (scheduled_at = station-wave scheduling per match)
+    # Update match fields (scheduled_at = station-wave scheduling per match).
+    # The payload is an untyped dict — clamp strings to their column widths
+    # so oversized values can't 500 on Postgres.
+    _limits = {"played_at": 30, "match_type": 20, "game_mode": 20, "scheduled_at": 30}
     for field in ("notes", "played_at", "match_type", "game_mode", "scheduled_at"):
         if field in payload:
-            setattr(match, field, payload[field])
+            value = payload[field]
+            if isinstance(value, str) and field in _limits:
+                value = value[:_limits[field]]
+            setattr(match, field, value)
 
     # Update participant scores
     if "participants" in payload:
@@ -737,6 +743,11 @@ def create_venue_tournament(
     venue = get_user_venue(db, current_user.id)
     if not venue:
         raise HTTPException(status_code=400, detail="Create your venue first")
+    if payload.entry_fee_paise:
+        raise HTTPException(
+            status_code=400,
+            detail="Paid entry is not supported yet — keep the entry fee at 0 (free)",
+        )
     payload.venue_id = venue.id           # forced: own venue only
     payload.is_featured = False           # platform-level flag stays locked
     payload.registration_open = False     # opens on approval

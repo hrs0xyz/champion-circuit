@@ -229,7 +229,9 @@ export function TournamentDetailPage() {
         </button>
       );
     }
-    if (isFull && t.registration_open && deadlineCountdown) {
+    // Deadline "passed" only when one is actually set and its countdown ran out
+    const deadlinePassed = Boolean(t.registration_deadline) && !deadlineCountdown;
+    if (isFull && t.registration_open && !deadlinePassed) {
       return (
         <button type="button" className="btn btn-secondary" onClick={() => setShowModal('waitlist')}>
           Full — join the waitlist

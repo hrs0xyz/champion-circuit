@@ -27,6 +27,8 @@ __pycache__/
 # *.sqlite3
 champion_circuit.db
 backend/champion_circuit.db
+backend/test_e2e.db
+backend/e2e_ctx.json
 
 # ── Secrets — NEVER commit these ──────────────────────────────────────────────
 .env

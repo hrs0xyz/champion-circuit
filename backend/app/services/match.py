@@ -167,16 +167,28 @@ def verify_match(db: Session, match_id: int, admin_user_id: int) -> Match:
     verifying the final completes the tournament (results + placement points).
     All mutations happen in one transaction; notifications fire after commit.
     """
-    match = db.get(Match, match_id)
+    # Row lock so two concurrent verifies of the same match serialize on
+    # Postgres (double-advance guard); SQLAlchemy skips FOR UPDATE on SQLite.
+    match = (
+        db.query(Match)
+        .filter(Match.id == match_id)
+        .with_for_update()
+        .first()
+    )
     if not match:
         raise ValueError("Match not found")
     if match.status == "completed":
         raise ValueError("Match already verified")
+    if match.status == "cancelled":
+        raise ValueError("Match is cancelled and cannot be verified")
 
     is_bracket = bool(match.tournament_id) and match.round_number > 0
     winner_side = ""
     next_match: Match | None = None
     if is_bracket:
+        t_check = db.get(Tournament, match.tournament_id)
+        if t_check and t_check.status == "cancelled":
+            raise ValueError("The tournament has been cancelled — matches can no longer be verified")
         winner_side = _bracket_winner_side(match)
         if match.next_match_id:
             next_match = db.get(Match, match.next_match_id)
@@ -630,7 +642,15 @@ def register_for_tournament(
 ) -> TournamentRegistration:
     from sqlalchemy.exc import IntegrityError
 
-    t = db.get(Tournament, tournament_id)
+    # Lock the tournament row so concurrent registrations for the last seat
+    # serialize on Postgres (capacity check-then-insert race); SQLAlchemy
+    # skips FOR UPDATE on SQLite.
+    t = (
+        db.query(Tournament)
+        .filter(Tournament.id == tournament_id)
+        .with_for_update()
+        .first()
+    )
     if not t:
         raise ValueError("Tournament not found")
     if t.status != "registration" or not t.registration_open:
@@ -727,6 +747,8 @@ def join_tournament_waitlist(
         raise ValueError("User not found")
     values = _validate_registration_payload(db, t, user, payload)
 
+    from sqlalchemy.exc import IntegrityError
+
     entry = db.query(TournamentWaitlistEntry).filter(
         TournamentWaitlistEntry.tournament_id == tournament_id,
         TournamentWaitlistEntry.user_id == user_id,
@@ -734,17 +756,20 @@ def join_tournament_waitlist(
     if entry:
         if entry.status == "waiting":
             raise ValueError("Already on the waitlist")
-        # Re-join: reuse the row (unique constraint), refresh the snapshot
-        entry.status = "waiting"
-        entry.promoted_at = ""
-        for key, val in values.items():
-            setattr(entry, key, val)
-    else:
-        entry = TournamentWaitlistEntry(
-            tournament_id=tournament_id, user_id=user_id, **values,
-        )
-        db.add(entry)
-    db.commit()
+        # Re-join: replace the row so the fresh entry goes to the BACK of the
+        # queue (created_at ordering) instead of keeping the old position.
+        db.delete(entry)
+        db.flush()
+    entry = TournamentWaitlistEntry(
+        tournament_id=tournament_id, user_id=user_id, **values,
+    )
+    db.add(entry)
+    try:
+        db.commit()
+    except IntegrityError:
+        # Double-tap race on the unique constraint
+        db.rollback()
+        raise ValueError("Already on the waitlist")
     db.refresh(entry)
     _notify(db, user_id, "tournament_registration",
             f"On the waitlist for {t.name}",
@@ -777,6 +802,10 @@ def promote_tournament_waitlist(db: Session, t: Tournament) -> list[TournamentRe
     if t.status != "registration" or _deadline_passed(t.registration_deadline):
         return promoted
 
+    # Same tournament-row lock as register_for_tournament: promotion and a
+    # direct registration racing for one freed seat must serialize.
+    db.query(Tournament).filter(Tournament.id == t.id).with_for_update().first()
+
     while _registration_count(db, t.id) < t.max_participants:
         entry = (
             db.query(TournamentWaitlistEntry)
@@ -798,6 +827,22 @@ def promote_tournament_waitlist(db: Session, t: Tournament) -> list[TournamentRe
             # Registered through some other path meanwhile — drop from the queue
             entry.status = "left"
             db.commit()
+            continue
+
+        # Re-validate roster overlap: another entry promoted (or registered)
+        # since join time may already cover one of this squad's players.
+        entry_ids = _roster_user_ids(entry)
+        others = db.query(TournamentRegistration).filter(
+            TournamentRegistration.tournament_id == t.id
+        ).all()
+        if any(entry_ids & _roster_user_ids(other) for other in others):
+            entry.status = "left"
+            db.commit()
+            _notify(db, entry.user_id, "tournament_registration",
+                    f"Waitlist spot skipped — {t.name}",
+                    "A player in your squad is already registered with another entry, "
+                    "so your waitlist spot was released.",
+                    f"/tournaments/{t.slug}")
             continue
 
         reg = TournamentRegistration(
@@ -1379,18 +1424,31 @@ def walkover_match(
         raise ValueError("Walkovers only apply to bracket matches")
     if match.status == "completed":
         raise ValueError("Match already verified")
+    if match.status == "cancelled":
+        raise ValueError("Match is cancelled")
     if winner_side not in ("A", "B"):
         raise ValueError("winner_side must be 'A' or 'B'")
     winners = [p for p in match.participants if p.team == winner_side]
     if not winners:
         raise ValueError("The chosen winning side is empty")
+    loser_side = "B" if winner_side == "A" else "A"
+    if not any(p.team == loser_side for p in match.participants):
+        raise ValueError(
+            "The opposing side is empty — wait for the previous round to decide it "
+            "before recording a walkover"
+        )
 
+    # Mutations stay uncommitted until verify_match's own commit, so a failed
+    # verification can't leave stale walkover results on a scheduled match.
     for p in match.participants:
         p.result = "win" if p.team == winner_side else "dnf"
     note = f"Walkover — {reason}" if reason else "Walkover"
     match.notes = f"{match.notes}\n{note}".strip()
-    db.commit()
-    return verify_match(db, match_id, admin_id)
+    try:
+        return verify_match(db, match_id, admin_id)
+    except Exception:
+        db.rollback()
+        raise
 
 
 # ── Venue slot blocking during tournament windows ─────────────────────────────
@@ -1915,12 +1973,14 @@ def get_user_teams(db: Session, user_id: int) -> list[Team]:
 # ── Notifications ─────────────────────────────────────────────────────────────
 
 def _notify(db: Session, user_id: int, ntype: str, title: str, body: str, link: str = "") -> None:
+    # Clamp to column limits — interpolated tournament names (up to 200 chars)
+    # would otherwise overflow String(200)/String(500) on Postgres.
     notif = Notification(
         user_id=user_id,
-        type=ntype,
-        title=title,
+        type=ntype[:40],
+        title=title[:200],
         body=body,
-        link=link,
+        link=link[:500],
     )
     db.add(notif)
     # Commit here: every caller invokes _notify after its own final commit, and

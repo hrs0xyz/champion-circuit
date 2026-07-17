@@ -126,11 +126,15 @@ export function TournamentWizard({ venues, isAdmin, create, onDone, onClose }: T
     for (let i = 0; i < stages.length; i += 1) {
       const s = stages[i];
       if (!s.name.trim()) continue;
+      // Owner flow has no venue select — stages without a custom location
+      // default to the tournament's own venue (slot blocking + map need it)
+      const stageVenueId = s.venue_id
+        || (!venues && !s.location_name.trim() ? (t.venue_id ?? 0) : 0);
       try {
         await ccApi.createStage(t.id, {
           name: s.name.trim(),
           stage_order: i + 1,
-          venue_id: s.venue_id,
+          venue_id: stageVenueId,
           location_name: s.location_name.trim(),
           starts_at: toIsoWithOffset(s.starts_at),
           ends_at: toIsoWithOffset(s.ends_at),

@@ -39,13 +39,26 @@ def get_optional_user(
 # ── Tournament access guards (shared by matches.py and admin.py routes) ───────
 
 def is_tournament_admin(db: Session, user: User, tournament_id: int) -> bool:
-    """Returns True if user is super admin or assigned match admin for this tournament."""
+    """
+    True if the user may operate this tournament's match-day flows:
+    super admin, an assigned match admin, or the owner of the venue hosting
+    it (per the permissions matrix — owners run their own tournaments).
+    """
     if user.is_admin:
         return True
-    return db.query(TournamentAdmin).filter(
+    assigned = db.query(TournamentAdmin).filter(
         TournamentAdmin.tournament_id == tournament_id,
         TournamentAdmin.user_id == user.id,
     ).first() is not None
+    if assigned:
+        return True
+    if user.is_venue_owner:
+        from app.services.venue import get_user_venue
+
+        t = db.get(Tournament, tournament_id)
+        my_venue = get_user_venue(db, user.id)
+        return bool(t and my_venue and t.venue_id == my_venue.id)
+    return False
 
 
 def require_tournament_manage_access(db: Session, user: User, tournament_id: int) -> Tournament:

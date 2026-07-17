@@ -43,7 +43,10 @@ Notifications:
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_current_user, get_optional_user, require_tournament_manage_access
+from app.api.deps import (
+    get_current_user, get_optional_user, is_tournament_admin,
+    require_tournament_manage_access,
+)
 from app.db.session import get_db
 from app.models.match import Tournament, TournamentRegistration
 from app.models.user import User
@@ -74,6 +77,7 @@ from app.services.match import (
     list_tournaments,
     mark_notifications_read,
     maybe_auto_cancel,
+    promote_tournament_waitlist,
     publish_news,
     record_tournament_result,
     register_for_tournament,
@@ -104,7 +108,14 @@ def create_match_route(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    if not current_user.is_admin and not is_venue_staff(db, payload.venue_id, current_user.id):
+    allowed = (
+        current_user.is_admin
+        or is_venue_staff(db, payload.venue_id, current_user.id)
+        # Match admins record side matches for their assigned tournament —
+        # the staff portal submits these with venue_id 0
+        or (payload.tournament_id and is_tournament_admin(db, current_user, payload.tournament_id))
+    )
+    if not allowed:
         raise HTTPException(status_code=403, detail="Only venue staff can record matches")
     match = create_match(db, payload, current_user.id)
     return serialize_match(match)
@@ -231,6 +242,13 @@ def create_tournament_route(
     db: Session = Depends(get_db),
 ):
     _require_admin(current_user)
+    if payload.entry_fee_paise:
+        # No payment flow exists yet — a paid tournament could never confirm
+        # a registration (generate_bracket only counts payment_status='paid')
+        raise HTTPException(
+            status_code=400,
+            detail="Paid entry is not supported yet — keep the entry fee at 0 (free)",
+        )
     t = create_tournament(db, payload, current_user.id)
     return serialize_tournament(t, db)
 
@@ -300,10 +318,19 @@ def tournament_detail_by_slug(
 
 
 @router.get("/tournaments/{tournament_id}")
-def tournament_detail(tournament_id: int, db: Session = Depends(get_db)):
+def tournament_detail(
+    tournament_id: int,
+    current_user: User | None = Depends(get_optional_user),
+    db: Session = Depends(get_db),
+):
     t = get_tournament(db, tournament_id)
     if not t:
         raise HTTPException(status_code=404, detail="Tournament not found")
+    # Same visibility rule as by-slug: drafts/pending are not public
+    if t.status in ("draft", "pending_approval"):
+        can_preview = current_user and (current_user.is_admin or t.created_by == current_user.id)
+        if not can_preview:
+            raise HTTPException(status_code=404, detail="Tournament not found")
     return serialize_tournament(t, db)
 
 
@@ -327,12 +354,21 @@ def update_tournament(
 ):
     t = require_tournament_manage_access(db, current_user, tournament_id)
     data = payload.model_dump(exclude_unset=True)
+    if data.get("entry_fee_paise"):
+        # Free entry at launch — the payment flow (Razorpay order/confirm)
+        # is not wired yet, and a paid tournament would be unrunnable.
+        raise HTTPException(
+            status_code=400,
+            detail="Paid entry is not supported yet — keep the entry fee at 0 (free)",
+        )
     if not current_user.is_admin:
-        # Venue owners: edit own drafts only; platform-level fields stay locked
-        if t.status not in ("draft", "pending_approval"):
+        # Venue owners: drafts only. Once submitted for approval the content
+        # is frozen — otherwise it could be swapped between review and approve.
+        if t.status != "draft":
             raise HTTPException(
                 status_code=403,
-                detail="Only draft tournaments can be edited — contact the platform admin",
+                detail="Only draft tournaments can be edited — "
+                       "ask the platform admin to send it back to draft first",
             )
         for locked in ("status", "is_featured", "venue_id", "listing_id", "registration_open"):
             data.pop(locked, None)
@@ -340,10 +376,18 @@ def update_tournament(
         data["venue_id"] = data["venue_id"] or None
     if "listing_id" in data:
         data["listing_id"] = data["listing_id"] or None
+    seats_may_have_freed = (
+        data.get("max_participants", 0) > t.max_participants
+        or data.get("registration_open") is True
+    )
     for key, val in data.items():
         setattr(t, key, val)
     db.commit()
     db.refresh(t)
+    if seats_may_have_freed:
+        # Freed seats go to the waitlist (oldest first) before new walk-ins;
+        # the promoter is internally guarded on status + deadline.
+        promote_tournament_waitlist(db, t)
     return serialize_tournament(t, db)
 
 

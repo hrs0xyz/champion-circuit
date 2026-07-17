@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ccApi, type BracketData, type BracketMatch, type BracketSide } from '../../lib/ccApi';
 
 const POLL_MS = 30_000;
@@ -69,19 +69,31 @@ function MatchCard({ m, myUserId }: { m: BracketMatch; myUserId?: number }) {
 export function BracketView({ tournamentId, live, myUserId }: BracketViewProps) {
   const [bracket, setBracket] = useState<BracketData | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // Ref (not state) so the polling closure always sees the latest value —
+  // a transient poll failure must not replace a loaded bracket with an error.
+  const hasLoaded = useRef(false);
 
   useEffect(() => {
     let cancelled = false;
+    hasLoaded.current = false;
     const load = () => {
       ccApi.tournamentBracket(tournamentId)
-        .then((b) => { if (!cancelled) { setBracket(b); setError(null); } })
-        .catch((e) => { if (!cancelled && !bracket) setError(e instanceof Error ? e.message : 'Failed to load bracket'); });
+        .then((b) => {
+          if (cancelled) return;
+          hasLoaded.current = true;
+          setBracket(b);
+          setError(null);
+        })
+        .catch((e) => {
+          if (!cancelled && !hasLoaded.current) {
+            setError(e instanceof Error ? e.message : 'Failed to load bracket');
+          }
+        });
     };
     load();
     if (!live) return () => { cancelled = true; };
     const timer = window.setInterval(load, POLL_MS);
     return () => { cancelled = true; window.clearInterval(timer); };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tournamentId, live]);
 
   if (error) return <p className="muted small">Bracket unavailable — {error}</p>;
