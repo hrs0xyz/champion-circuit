@@ -5,6 +5,7 @@ import { ccApi, type Venue, type Tournament, type NewsArticle } from '../../lib/
 import { ApiError } from '../../lib/api';
 import { ActivityLogPage } from '../admin/ActivityLogPage';
 import { CoverImagePicker, BodyEditor } from '../../components/ui/NewsEditor';
+import { TournamentWizard } from '../../components/tournaments/TournamentWizard';
 
 const BASE = import.meta.env.VITE_API_URL ?? 'http://127.0.0.1:8000';
 
@@ -236,11 +237,18 @@ function AdminVenues() {
 // ── Tournaments tab ───────────────────────────────────────────────────────────
 function AdminTournaments() {
   const [tournaments, setTournaments] = useState<Tournament[]>([]);
+  const [venues, setVenues] = useState<Venue[]>([]);
   const [assigning, setAssigning] = useState<number | null>(null);
   const [assignUsername, setAssignUsername] = useState('');
+  const [showWizard, setShowWizard] = useState(false);
+  const [busy, setBusy] = useState<number | null>(null);
   const [msg, setMsg] = useState('');
 
-  useEffect(() => { ccApi.tournaments().then(setTournaments).catch(() => {}); }, []);
+  const load = () => ccApi.adminTournaments().then(setTournaments).catch(() => {});
+  useEffect(() => {
+    void load();
+    adminReq<Venue[]>('/api/admin/venues').then(setVenues).catch(() => {});
+  }, []);
 
   async function assignAdmin(tId: number) {
     if (!assignUsername) return;
@@ -252,30 +260,163 @@ function AdminTournaments() {
 
   async function updateStatus(tId: number, newStatus: string) {
     try {
-      await adminReq(`/api/tournaments/${tId}`, { method: 'PUT', body: JSON.stringify({ status: newStatus }) });
-      ccApi.tournaments().then(setTournaments).catch(() => {});
+      await ccApi.updateTournament(tId, { status: newStatus });
+      void load();
     } catch (e) { setMsg(e instanceof ApiError ? e.message : 'Failed'); }
+  }
+
+  async function toggleRegistration(t: Tournament) {
+    try {
+      await ccApi.updateTournament(t.id, { registration_open: !t.registration_open });
+      void load();
+    } catch (e) { setMsg(e instanceof ApiError ? e.message : 'Failed'); }
+  }
+
+  async function generateBracket(t: Tournament) {
+    if (!window.confirm(
+      `Generate the knockout bracket for "${t.name}"?\n\nThis closes registration, `
+      + `sets the tournament LIVE, blocks venue slots for stage windows, and `
+      + `notifies every participant. It cannot be re-run.`,
+    )) return;
+    setBusy(t.id);
+    try {
+      await ccApi.generateBracket(t.id);
+      setMsg(`Bracket generated — "${t.name}" is live.`);
+      void load();
+    } catch (e) { setMsg(e instanceof ApiError ? e.message : 'Failed'); }
+    finally { setBusy(null); }
+  }
+
+  async function approve(t: Tournament) {
+    try {
+      await ccApi.approveTournament(t.id);
+      setMsg(`"${t.name}" approved — registration is open.`);
+      void load();
+    } catch (e) { setMsg(e instanceof ApiError ? e.message : 'Failed'); }
+  }
+
+  async function reject(t: Tournament) {
+    const reason = window.prompt(`Reject "${t.name}" — reason for the venue owner:`) ?? '';
+    try {
+      await ccApi.rejectTournament(t.id, reason);
+      setMsg(`"${t.name}" sent back to draft.`);
+      void load();
+    } catch (e) { setMsg(e instanceof ApiError ? e.message : 'Failed'); }
+  }
+
+  async function cancel(t: Tournament) {
+    const reason = window.prompt(`Cancel "${t.name}"? Every registrant is notified. Reason:`);
+    if (reason === null) return;
+    try {
+      await ccApi.cancelTournament(t.id, reason);
+      setMsg(`"${t.name}" cancelled.`);
+      void load();
+    } catch (e) { setMsg(e instanceof ApiError ? e.message : 'Failed'); }
+  }
+
+  async function blockSlots(t: Tournament) {
+    setBusy(t.id);
+    try {
+      const res = await ccApi.blockTournamentSlots(t.id);
+      const conflicts = res.conflicts.length;
+      setMsg(
+        `Blocked ${res.blocked.length} slot window(s) for "${t.name}".`
+        + (conflicts ? ` ⚠ ${conflicts} window(s) overlap existing bookings — resolve manually.` : ''),
+      );
+    } catch (e) { setMsg(e instanceof ApiError ? e.message : 'Failed'); }
+    finally { setBusy(null); }
+  }
+
+  async function downloadCsv(t: Tournament) {
+    try { await ccApi.downloadRegistrationsCsv(t.id, t.slug); }
+    catch (e) { setMsg(e instanceof ApiError ? e.message : 'Download failed'); }
   }
 
   return (
     <div className="staff-section">
-      <h2 className="staff-h2">Tournaments ({tournaments.length})</h2>
+      <div className="staff-section__header">
+        <h2 className="staff-h2">Tournaments ({tournaments.length})</h2>
+        <button type="button" className="btn btn-primary btn-sm" onClick={() => setShowWizard((v) => !v)}>
+          {showWizard ? 'Close wizard' : '+ Create tournament'}
+        </button>
+      </div>
       {msg ? <p className="staff-msg">{msg}</p> : null}
+
+      {showWizard ? (
+        <TournamentWizard
+          venues={venues.map((v) => ({ id: v.id, name: v.name }))}
+          isAdmin
+          create={(payload) => ccApi.createTournament(payload)}
+          onDone={(_t, message) => { setShowWizard(false); setMsg(message); void load(); }}
+          onClose={() => setShowWizard(false)}
+        />
+      ) : null}
+
       {tournaments.map((t) => (
         <div key={t.id} className="staff-card">
           <div className="staff-card__header">
             <div>
               <h3 className="staff-card__title">{t.name}</h3>
-              <p className="staff-card__meta">{t.game} · {t.mode} · {t.participant_count}/{t.max_participants} players</p>
+              <p className="staff-card__meta">
+                {t.game} · {t.mode} · {t.participant_count}/{t.max_participants} players
+                {t.venue ? ` · ${t.venue.name}` : ''}
+                {t.entry_fee_paise === 0 ? ' · FREE' : ` · ₹${t.entry_fee_paise / 100}`}
+                {t.awards_leaderboard_points ? ' · points ON' : ' · points OFF'}
+              </p>
             </div>
-            <span className="staff-badge">{t.status}</span>
+            <span className={`staff-badge${t.status === 'pending_approval' ? ' staff-badge--admin' : ''}`}>
+              {t.status.replace('_', ' ')}
+            </span>
           </div>
-          <div className="staff-card__actions">
-            <select className="auth-input" style={{ width: 160 }} value={t.status} onChange={(e) => void updateStatus(t.id, e.target.value)}>
-              {['draft','registration','live','completed','cancelled'].map((s) => <option key={s} value={s}>{s}</option>)}
+
+          <div className="staff-trn-actions">
+            {t.status === 'pending_approval' ? (
+              <>
+                <button type="button" className="btn btn-primary btn-sm" onClick={() => void approve(t)}>Approve</button>
+                <button type="button" className="staff-action-btn staff-action-btn--danger" onClick={() => void reject(t)}>Reject</button>
+              </>
+            ) : null}
+            <select
+              className="auth-input" style={{ width: 170 }} value={t.status}
+              onChange={(e) => void updateStatus(t.id, e.target.value)}
+              title="Force status (prefer the action buttons)"
+            >
+              {['draft', 'pending_approval', 'registration', 'live', 'completed', 'cancelled'].map((s) => (
+                <option key={s} value={s}>{s.replace('_', ' ')}</option>
+              ))}
             </select>
-            <button type="button" className="btn btn-secondary btn-sm" onClick={() => setAssigning(t.id)}>Assign match admin</button>
+            {t.status === 'registration' ? (
+              <>
+                <button type="button" className="btn btn-secondary btn-sm" onClick={() => void toggleRegistration(t)}>
+                  {t.registration_open ? 'Close registration' : 'Open registration'}
+                </button>
+                <button
+                  type="button" className="btn btn-primary btn-sm"
+                  disabled={busy === t.id}
+                  onClick={() => void generateBracket(t)}
+                >
+                  {busy === t.id ? 'Working…' : '⚔ Generate bracket'}
+                </button>
+              </>
+            ) : null}
+            {t.status === 'live' ? (
+              <button type="button" className="btn btn-secondary btn-sm" disabled={busy === t.id} onClick={() => void blockSlots(t)}>
+                Block venue slots
+              </button>
+            ) : null}
+            <button type="button" className="staff-action-btn" onClick={() => void downloadCsv(t)}>
+              ⬇ Registrations CSV
+            </button>
+            <button type="button" className="btn btn-secondary btn-sm" onClick={() => setAssigning(t.id)}>
+              Assign match admin
+            </button>
+            {t.status !== 'completed' && t.status !== 'cancelled' ? (
+              <button type="button" className="staff-action-btn staff-action-btn--danger" onClick={() => void cancel(t)}>
+                Cancel event
+              </button>
+            ) : null}
           </div>
+
           {assigning === t.id && (
             <div className="staff-inline-form">
               <input className="auth-input" placeholder="@username" value={assignUsername} onChange={(e) => setAssignUsername(e.target.value)} style={{ flex: 1 }} />

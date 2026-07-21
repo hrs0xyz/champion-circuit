@@ -5,7 +5,7 @@ Match, scoring, leaderboard, tournament, and team models.
 from datetime import datetime
 
 from sqlalchemy import (
-    Boolean, DateTime, ForeignKey, Integer, String, Text, func,
+    Boolean, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint, func,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -46,6 +46,23 @@ class Match(Base):
         Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True
     )
     verified_at: Mapped[str] = mapped_column(String(30), default="", nullable=False)
+
+    # ── Bracket fields (tournament knockout matches only; 0/empty otherwise) ──
+    stage_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("tournament_stages.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    # 1 = first round within the tournament; 0 = not a bracket match
+    round_number: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    # slot within the round, top→bottom (0-based)
+    bracket_position: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    next_match_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("matches.id", ondelete="SET NULL"), nullable=True
+    )
+    # which side of the next match the winner advances into: "A" | "B"
+    next_match_slot: Mapped[str] = mapped_column(String(1), default="", nullable=False)
+    is_bye: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    scheduled_at: Mapped[str] = mapped_column(String(30), default="", nullable=False)  # ISO-8601
+
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
@@ -167,7 +184,11 @@ class Tournament(Base):
     registration_deadline: Mapped[str] = mapped_column(String(30), default="", nullable=False)
     starts_at: Mapped[str] = mapped_column(String(30), default="", nullable=False)
     ends_at: Mapped[str] = mapped_column(String(30), default="", nullable=False)
-    # draft | registration | live | completed | cancelled
+    # 0 = no minimum; below this at deadline → auto-cancel
+    min_participants: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    # finish-position points feed the leaderboard when enabled
+    awards_leaderboard_points: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    # draft | pending_approval | registration | live | completed | cancelled
     status: Mapped[str] = mapped_column(String(20), default="draft", nullable=False, index=True)
     is_exclusive: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     is_featured: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
@@ -185,6 +206,47 @@ class Tournament(Base):
     results: Mapped[list["TournamentResult"]] = relationship(
         "TournamentResult", back_populates="tournament", cascade="all, delete-orphan"
     )
+    stages: Mapped[list["TournamentStage"]] = relationship(
+        "TournamentStage", back_populates="tournament",
+        order_by="TournamentStage.stage_order", cascade="all, delete-orphan"
+    )
+
+
+# ── Tournament stages (multi-venue support) ───────────────────────────────────
+
+class TournamentStage(Base):
+    """
+    A stage is a group of rounds sharing a time window and a location.
+    Single-venue tournaments have one stage; multi-venue events map stages
+    to different venues (e.g. Qualifiers at Game Zone A, Finals at Game Zone B).
+    Location resolution: venue_id set → venue fields; else custom
+    location_name/address/lat/lng; else (future) is_online.
+    """
+    __tablename__ = "tournament_stages"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    tournament_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("tournaments.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    name: Mapped[str] = mapped_column(String(120), nullable=False)   # "Quarter Finals", "Group Stage"
+    stage_order: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
+
+    # Location: partner venue OR custom location OR (future) online
+    venue_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("venues.id", ondelete="SET NULL"), nullable=True
+    )
+    is_online: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)  # future-proofing
+    # For non-partner locations (school ground, rented hall) or override:
+    location_name: Mapped[str] = mapped_column(String(200), default="", nullable=False)
+    address: Mapped[str] = mapped_column(String(500), default="", nullable=False)
+    lat: Mapped[str] = mapped_column(String(20), default="", nullable=False)   # same convention as Venue
+    lng: Mapped[str] = mapped_column(String(20), default="", nullable=False)
+
+    starts_at: Mapped[str] = mapped_column(String(30), default="", nullable=False)  # ISO-8601
+    ends_at: Mapped[str] = mapped_column(String(30), default="", nullable=False)
+    notes: Mapped[str] = mapped_column(Text, default="", nullable=False)
+
+    tournament: Mapped["Tournament"] = relationship("Tournament", back_populates="stages")
 
 
 # ── Tournament admin assignments ──────────────────────────────────────────────
@@ -213,6 +275,9 @@ class TournamentAdmin(Base):
 
 class TournamentRegistration(Base):
     __tablename__ = "tournament_registrations"
+    __table_args__ = (
+        UniqueConstraint("tournament_id", "user_id", name="uq_tournament_registration_user"),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     tournament_id: Mapped[int] = mapped_column(
@@ -228,11 +293,51 @@ class TournamentRegistration(Base):
     payment_status: Mapped[str] = mapped_column(String(20), default="unpaid", nullable=False)
     razorpay_order_id: Mapped[str] = mapped_column(String(100), default="", nullable=False)
     seed_number: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    # Match-day check-in (QR / short code shown by the player, scanned by staff)
+    checked_in_at: Mapped[str] = mapped_column(String(30), default="", nullable=False)
+    checkin_code: Mapped[str] = mapped_column(String(12), default="", nullable=False, index=True)
+    # Contact snapshot captured at registration time (organizer ops / CSV export)
+    contact_name: Mapped[str] = mapped_column(String(120), default="", nullable=False)
+    contact_phone: Mapped[str] = mapped_column(String(20), default="", nullable=False)
+    # Squad roster snapshot: [{"user_id": int, "name": str, "phone": str}]
+    roster_json: Mapped[str] = mapped_column(Text, default="[]", nullable=False)
     registered_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
 
     tournament: Mapped["Tournament"] = relationship("Tournament", back_populates="registrations")
+
+
+class TournamentWaitlistEntry(Base):
+    """
+    Queue for a full tournament. On a withdrawal before the deadline the oldest
+    'waiting' entry is auto-promoted into a real registration.
+    (Distinct from models.waitlist.WaitlistEntry — the early-access email list.)
+    """
+    __tablename__ = "tournament_waitlist"
+    __table_args__ = (
+        UniqueConstraint("tournament_id", "user_id", name="uq_tournament_waitlist_user"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    tournament_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("tournaments.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    user_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    team_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("teams.id", ondelete="SET NULL"), nullable=True
+    )
+    contact_name: Mapped[str] = mapped_column(String(120), default="", nullable=False)
+    contact_phone: Mapped[str] = mapped_column(String(20), default="", nullable=False)
+    roster_json: Mapped[str] = mapped_column(Text, default="[]", nullable=False)
+    # waiting | promoted | left
+    status: Mapped[str] = mapped_column(String(20), default="waiting", nullable=False)
+    promoted_at: Mapped[str] = mapped_column(String(30), default="", nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
 
 
 class TournamentResult(Base):

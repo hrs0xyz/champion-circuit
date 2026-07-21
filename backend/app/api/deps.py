@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session
 
 from app.core.security import decode_access_token
 from app.db.session import get_db
+from app.models.match import Tournament, TournamentAdmin
 from app.models.user import User
 from app.services.users import get_user_by_id
 
@@ -33,4 +34,49 @@ def get_optional_user(
         return None
     user = get_user_by_id(db, int(subject))
     return user if user and user.is_active else None
+
+
+# ── Tournament access guards (shared by matches.py and admin.py routes) ───────
+
+def is_tournament_admin(db: Session, user: User, tournament_id: int) -> bool:
+    """
+    True if the user may operate this tournament's match-day flows:
+    super admin, an assigned match admin, or the owner of the venue hosting
+    it (per the permissions matrix — owners run their own tournaments).
+    """
+    if user.is_admin:
+        return True
+    assigned = db.query(TournamentAdmin).filter(
+        TournamentAdmin.tournament_id == tournament_id,
+        TournamentAdmin.user_id == user.id,
+    ).first() is not None
+    if assigned:
+        return True
+    if user.is_venue_owner:
+        from app.services.venue import get_user_venue
+
+        t = db.get(Tournament, tournament_id)
+        my_venue = get_user_venue(db, user.id)
+        return bool(t and my_venue and t.venue_id == my_venue.id)
+    return False
+
+
+def require_tournament_manage_access(db: Session, user: User, tournament_id: int) -> Tournament:
+    """
+    Gate for managing a tournament (edit, stages, bracket, match admins).
+    Super admin: any tournament. Venue owner: only tournaments at their own venue.
+    Returns the tournament or raises 403/404.
+    """
+    from app.services.venue import get_user_venue
+
+    if not user.is_admin and not user.is_venue_owner:
+        raise HTTPException(status_code=403, detail="Not authorised")
+    t = db.get(Tournament, tournament_id)
+    if not t:
+        raise HTTPException(status_code=404, detail="Tournament not found")
+    if not user.is_admin:
+        my_venue = get_user_venue(db, user.id)
+        if not my_venue or t.venue_id != my_venue.id:
+            raise HTTPException(status_code=403, detail="You can only manage your own tournaments")
+    return t
 
