@@ -964,20 +964,6 @@ def check_in_registration(
     return reg
 
 
-def remind_checkin(db: Session, t: Tournament) -> int:
-    """Nudge every registrant who hasn't checked in yet. Returns count."""
-    pending = db.query(TournamentRegistration).filter(
-        TournamentRegistration.tournament_id == t.id,
-        TournamentRegistration.checked_in_at == "",
-    ).all()
-    for reg in pending:
-        _notify(db, reg.user_id, "tournament_checkin",
-                f"Check in for {t.name}",
-                "Show your QR code (in My Matches → Tournaments) at the venue desk to check in.",
-                f"/tournaments/{t.slug}")
-    return len(pending)
-
-
 def registrations_csv(db: Session, t: Tournament) -> str:
     """Spreadsheet of registrations for organizer ops (the 'Google Form' export)."""
     import csv
