@@ -48,7 +48,14 @@ async def lifespan(app: FastAPI):
     try:
         email_service = get_email_service()
         # Force initialization to check templates
-        _ = email_service.jinja_env
+        jinja_env = email_service.jinja_env
+        
+        if jinja_env:
+            available = jinja_env.list_templates()
+            print(f"✅ Email service initialized - Jinja2 sees {len(available)} templates: {sorted(available)}")
+        else:
+            print("❌ Email service Jinja2 environment is None!")
+            
         print("✅ Email service initialized successfully")
     except Exception as e:
         print(f"❌ Email service initialization failed: {e}")
