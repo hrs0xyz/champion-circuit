@@ -8,6 +8,10 @@ from app.api.routes import admin, auth, health, matches, reviews, uploads, users
 from app.core.config import settings
 from app.db.migrations import ensure_dev_schema
 from app.db.session import Base, engine
+from app.services.email_service import get_email_service
+import logging
+
+logger = logging.getLogger(__name__)
 
 # ── Import all models so SQLAlchemy registers them before create_all ──────────
 from app.models import user as _user_model          # noqa: F401
@@ -34,6 +38,24 @@ app = FastAPI(
     docs_url="/docs",
     redoc_url="/redoc",
 )
+
+
+@app.on_event("startup")
+async def startup_event():
+    """Initialize services and verify critical resources on startup."""
+    logger.info("=== Champion Circuit API Starting Up ===")
+    
+    # Initialize email service and verify templates
+    try:
+        email_service = get_email_service()
+        # Force initialization to check templates
+        _ = email_service.jinja_env
+        logger.info("✅ Email service initialized successfully")
+    except Exception as e:
+        logger.error(f"❌ Email service initialization failed: {e}", exc_info=True)
+    
+    logger.info("=== Startup Complete ===")
+
 
 app.add_middleware(
     CORSMiddleware,

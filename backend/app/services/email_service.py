@@ -70,6 +70,9 @@ class SESEmailService:
         self._jinja_env: Optional[Environment] = None
         self._initialized = False
         self._lock = threading.Lock()
+        
+        # Log initialization intent
+        logger.info("SESEmailService instance created, will initialize lazily on first use")
 
     def _initialize(self) -> None:
         """Lazy initialization of SES client and Jinja2 environment."""
