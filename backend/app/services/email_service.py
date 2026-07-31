@@ -181,12 +181,26 @@ class SESEmailService:
             EmailTemplateError: If template not found or rendering fails
         """
         if not self.jinja_env:
+            # Log detailed path information when env is not initialized
+            templates_dir = Path(__file__).parent.parent / "templates" / "email"
+            logger.error(f"Jinja2 environment not initialized!")
+            logger.error(f"Expected templates at: {templates_dir.absolute()}")
+            logger.error(f"Directory exists: {templates_dir.exists()}")
+            if templates_dir.exists():
+                logger.error(f"Files in directory: {list(templates_dir.glob('*.html'))}")
             raise EmailTemplateError("Jinja2 environment not initialized. Check templates directory.")
 
         try:
+            # Log available templates before attempting to load
+            available_templates = self.jinja_env.list_templates()
+            logger.info(f"Attempting to load template '{template_name}' from {len(available_templates)} available templates")
+            logger.info(f"Available templates: {available_templates}")
+            
             template = self.jinja_env.get_template(template_name)
             return template.render(**context)
         except TemplateNotFound as e:
+            logger.error(f"Template '{template_name}' not found in Jinja environment")
+            logger.error(f"Template search path: {self.jinja_env.loader.searchpath if hasattr(self.jinja_env.loader, 'searchpath') else 'unknown'}")
             raise EmailTemplateError(f"Email template not found: {template_name}") from e
         except Exception as e:
             raise EmailTemplateError(f"Template rendering failed for {template_name}: {e}") from e
