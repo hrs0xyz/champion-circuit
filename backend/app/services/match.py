@@ -2083,7 +2083,10 @@ def remind_checkin(db: Session, tournament: Tournament, user_ids: list[int] | No
     If user_ids is provided, only send to those specific users.
     Returns the number of participants notified.
     """
+    import logging
     from app.services.email import send_checkin_reminder_email
+    
+    logger = logging.getLogger(__name__)
     
     query = db.query(TournamentRegistration).filter(
         TournamentRegistration.tournament_id == tournament.id,
@@ -2095,15 +2098,20 @@ def remind_checkin(db: Session, tournament: Tournament, user_ids: list[int] | No
         query = query.filter(TournamentRegistration.user_id.in_(user_ids))
     
     registrations = query.all()
+    logger.info(f"Found {len(registrations)} non-checked-in registrations for tournament {tournament.id}")
     
     notified = 0
     for reg in registrations:
         user = db.get(User, reg.user_id)
-        if not user or not user.email:
+        if not user:
+            logger.warning(f"User {reg.user_id} not found for registration {reg.id}")
+            continue
+        if not user.email:
+            logger.warning(f"User {reg.user_id} ({user.username}) has no email address")
             continue
         
         try:
-            send_checkin_reminder_email(
+            success = send_checkin_reminder_email(
                 to_email=user.email,
                 display=user.display_name or user.username,
                 tournament_name=tournament.name,
@@ -2112,9 +2120,13 @@ def remind_checkin(db: Session, tournament: Tournament, user_ids: list[int] | No
                 when=tournament.starts_at or "",
                 venue_name=tournament.venue.name if tournament.venue else "",
             )
-            notified += 1
-        except Exception:
-            # Silent fail for individual emails
-            pass
+            if success:
+                notified += 1
+                logger.info(f"Reminder sent to {user.email} (user_id={user.id})")
+            else:
+                logger.error(f"Failed to send reminder to {user.email} (user_id={user.id})")
+        except Exception as e:
+            logger.error(f"Exception sending reminder to {user.email}: {e}", exc_info=True)
     
+    logger.info(f"Reminder emails sent: {notified}/{len(registrations)}")
     return notified
