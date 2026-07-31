@@ -264,7 +264,10 @@ def send_checkin_reminder_email(
     to_email: str, display: str, tournament_name: str, slug: str,
     checkin_code: str, when: str = "", venue_name: str = "",
 ) -> bool:
-    """Send check-in reminder email using AWS SES."""
+    """
+    Send check-in reminder email using AWS SES.
+    Template: checkin_reminder.html
+    """
     email_service = get_email_service()
     
     try:
