@@ -133,6 +133,11 @@ class SESEmailService:
                     trim_blocks=True,
                     lstrip_blocks=True,
                 )
+                
+                # Verify Jinja2 can see the templates
+                jinja_templates = self._jinja_env.list_templates()
+                logger.info(f"Jinja2 sees {len(jinja_templates)} templates: {sorted(jinja_templates)}")
+                
                 logger.info(f"Jinja2 environment initialized with template dir: {templates_dir}")
             else:
                 logger.error(f"Email templates directory NOT FOUND: {abs_templates_dir}")
