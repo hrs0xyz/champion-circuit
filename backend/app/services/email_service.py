@@ -200,6 +200,14 @@ class SESEmailService:
             try:
                 available = self.jinja_env.list_templates()
                 print(f"[_render_template] Jinja2 lists {len(available)} templates: {available}")
+                
+                # Try to get the template source to see if it's readable
+                try:
+                    source, filename, uptodate = self.jinja_env.loader.get_source(self.jinja_env, template_name)
+                    print(f"[_render_template] Template source loaded! Filename: {filename}, Length: {len(source)}")
+                except Exception as source_err:
+                    print(f"[_render_template] ERROR loading template source: {source_err}")
+                    
             except Exception as e:
                 print(f"[_render_template] ERROR listing templates: {e}")
         
