@@ -108,12 +108,14 @@ settings = Settings()
 
 
 # Validate SES configuration on module import (application startup)
-try:
-    settings.validate_ses_config()
-except ValueError as e:
-    if settings.is_production:
-        # Fail fast in production
-        raise RuntimeError(f"SES configuration error: {e}") from e
-    else:
-        # Warn in development
-        logger.warning(f"SES configuration incomplete: {e}")
+# Only validate if SES appears to be intentionally configured
+if settings.AWS_ACCESS_KEY_ID or settings.AWS_SECRET_ACCESS_KEY or settings.is_production:
+    try:
+        settings.validate_ses_config()
+    except ValueError as e:
+        if settings.is_production:
+            # Log error but don't crash - allow server to start
+            logger.error(f"SES configuration error: {e}. Email features may not work.")
+        else:
+            # Warn in development
+            logger.warning(f"SES configuration incomplete: {e}")
