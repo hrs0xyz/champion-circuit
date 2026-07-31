@@ -19,46 +19,48 @@ logger = logging.getLogger(__name__)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Lifespan context manager for startup and shutdown events."""
-    # Startup
-    logger.info("=== Champion Circuit API Starting Up ===")
+    # Startup - use print() since logging may not be configured yet
+    print("=== Champion Circuit API Starting Up ===")
     
     # Log current working directory and file structure
     import os
     cwd = os.getcwd()
-    logger.info(f"Current working directory: {cwd}")
+    print(f"Current working directory: {cwd}")
     
     # Check templates directory
     templates_dir = Path(__file__).parent / "templates" / "email"
     abs_templates = templates_dir.absolute()
-    logger.info(f"Templates directory path: {abs_templates}")
-    logger.info(f"Templates directory exists: {templates_dir.exists()}")
+    print(f"Templates directory path: {abs_templates}")
+    print(f"Templates directory exists: {templates_dir.exists()}")
     
     if templates_dir.exists():
         template_files = sorted([f.name for f in templates_dir.glob("*.html")])
-        logger.info(f"Found {len(template_files)} templates: {template_files}")
+        print(f"Found {len(template_files)} templates: {template_files}")
     else:
-        logger.error(f"Templates directory NOT FOUND at: {abs_templates}")
+        print(f"Templates directory NOT FOUND at: {abs_templates}")
         # Try alternate locations
         alt_path1 = Path(cwd) / "app" / "templates" / "email"
         alt_path2 = Path(cwd) / "backend" / "app" / "templates" / "email"
-        logger.info(f"Checking alternate path 1: {alt_path1} exists={alt_path1.exists()}")
-        logger.info(f"Checking alternate path 2: {alt_path2} exists={alt_path2.exists()}")
+        print(f"Checking alternate path 1: {alt_path1} exists={alt_path1.exists()}")
+        print(f"Checking alternate path 2: {alt_path2} exists={alt_path2.exists()}")
     
     # Initialize email service and verify templates
     try:
         email_service = get_email_service()
         # Force initialization to check templates
         _ = email_service.jinja_env
-        logger.info("✅ Email service initialized successfully")
+        print("✅ Email service initialized successfully")
     except Exception as e:
-        logger.error(f"❌ Email service initialization failed: {e}", exc_info=True)
+        print(f"❌ Email service initialization failed: {e}")
+        import traceback
+        traceback.print_exc()
     
-    logger.info("=== Startup Complete ===")
+    print("=== Startup Complete ===")
     
     yield  # Application runs here
     
     # Shutdown (if needed)
-    logger.info("=== Shutting down ===")
+    print("=== Shutting down ===")
 
 
 # ── Import all models so SQLAlchemy registers them before create_all ──────────
