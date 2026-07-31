@@ -82,6 +82,10 @@ class SESEmailService:
         with self._lock:
             if self._initialized:  # Double-check after acquiring lock
                 return
+            
+            import sys
+            print(f"[EMAIL SERVICE] _initialize() called from: {sys._getframe(1).f_code.co_name}", file=sys.stderr)
+            print(f"[EMAIL SERVICE] Instance ID: {id(self)}", file=sys.stderr)
 
             # Initialize SES client
             try:
@@ -188,6 +192,10 @@ class SESEmailService:
         Raises:
             EmailTemplateError: If template not found or rendering fails
         """
+        print(f"[_render_template] Called with template_name={template_name}")
+        print(f"[_render_template] self.jinja_env is None: {self.jinja_env is None}")
+        print(f"[_render_template] self._initialized: {self._initialized}")
+        
         if not self.jinja_env:
             # Log detailed path information when env is not initialized
             templates_dir = Path(__file__).parent.parent / "templates" / "email"
