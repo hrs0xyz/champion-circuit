@@ -222,18 +222,30 @@ class SESEmailService:
             raise EmailTemplateError("Jinja2 environment not initialized. Check templates directory.")
 
         try:
-            # Log available templates before attempting to load
-            available_templates = self.jinja_env.list_templates()
-            logger.info(f"Attempting to load template '{template_name}' from {len(available_templates)} available templates")
-            logger.info(f"Available templates: {available_templates}")
+            # BYPASS get_template() - load source directly and compile manually
+            print(f"[_render_template] Attempting to load template source directly...")
+            source, filename, uptodate = self.jinja_env.loader.get_source(self.jinja_env, template_name)
+            print(f"[_render_template] Source loaded from {filename}, compiling...")
             
-            template = self.jinja_env.get_template(template_name)
-            return template.render(**context)
+            # Manually compile the template
+            template_code = self.jinja_env.compile(source, filename=filename)
+            print(f"[_render_template] Template compiled, creating module...")
+            
+            # Create template from compiled code
+            from jinja2 import Template
+            template = self.jinja_env.from_string(source)
+            print(f"[_render_template] Template created, rendering...")
+            
+            rendered = template.render(**context)
+            print(f"[_render_template] Rendered successfully! Length: {len(rendered)}")
+            return rendered
+            
         except TemplateNotFound as e:
             logger.error(f"Template '{template_name}' not found in Jinja environment")
             logger.error(f"Template search path: {self.jinja_env.loader.searchpath if hasattr(self.jinja_env.loader, 'searchpath') else 'unknown'}")
             raise EmailTemplateError(f"Email template not found: {template_name}") from e
         except Exception as e:
+            print(f"[_render_template] ERROR during manual render: {e}")
             raise EmailTemplateError(f"Template rendering failed for {template_name}: {e}") from e
 
     def send_email(
