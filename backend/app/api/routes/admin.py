@@ -706,7 +706,10 @@ def staff_remind_checkin(
     """
     if not is_tournament_admin(db, current_user, tournament_id):
         raise HTTPException(status_code=403, detail="Not assigned to this tournament")
-    t = db.get(Tournament, tournament_id)
+    
+    # Load tournament with venue relationship
+    from sqlalchemy.orm import joinedload
+    t = db.query(Tournament).options(joinedload(Tournament.venue)).filter(Tournament.id == tournament_id).first()
     if not t:
         raise HTTPException(status_code=404, detail="Tournament not found")
     
