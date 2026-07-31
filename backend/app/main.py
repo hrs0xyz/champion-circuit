@@ -3,6 +3,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 # from fastapi.staticfiles import StaticFiles
+from contextlib import asynccontextmanager
 
 from app.api.routes import admin, auth, health, matches, reviews, uploads, users, venues, vouchers, activity
 from app.core.config import settings
@@ -10,39 +11,15 @@ from app.db.migrations import ensure_dev_schema
 from app.db.session import Base, engine
 from app.services.email_service import get_email_service
 import logging
+from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
-# ── Import all models so SQLAlchemy registers them before create_all ──────────
-from app.models import user as _user_model          # noqa: F401
-from app.models import venue as _venue_model        # noqa: F401
-from app.models import match as _match_model        # noqa: F401
-from app.models import voucher as _voucher_model    # noqa: F401
-from app.models import waitlist as _waitlist_model  # noqa: F401
-from app.models import activity as _activity_model  # noqa: F401
 
-
-
-# ── Create all tables (idempotent) ────────────────────────────────────────────
-Base.metadata.create_all(bind=engine)
-ensure_dev_schema()  # add missing columns to existing SQLite DBs
-
-# ── Ensure upload directories exist ──────────────────────────────────────────
-# Path(settings.UPLOAD_DIR).mkdir(parents=True, exist_ok=True)
-# Path(settings.UPLOAD_DIR, "listings").mkdir(parents=True, exist_ok=True)
-
-app = FastAPI(
-    title=settings.APP_NAME,
-    version="2.0.0",
-    description="Champion Circuit API — Sports + Esports + Vouchers",
-    docs_url="/docs",
-    redoc_url="/redoc",
-)
-
-
-@app.on_event("startup")
-async def startup_event():
-    """Initialize services and verify critical resources on startup."""
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Lifespan context manager for startup and shutdown events."""
+    # Startup
     logger.info("=== Champion Circuit API Starting Up ===")
     
     # Log current working directory and file structure
@@ -51,7 +28,6 @@ async def startup_event():
     logger.info(f"Current working directory: {cwd}")
     
     # Check templates directory
-    from pathlib import Path
     templates_dir = Path(__file__).parent / "templates" / "email"
     abs_templates = templates_dir.absolute()
     logger.info(f"Templates directory path: {abs_templates}")
@@ -78,7 +54,39 @@ async def startup_event():
         logger.error(f"❌ Email service initialization failed: {e}", exc_info=True)
     
     logger.info("=== Startup Complete ===")
+    
+    yield  # Application runs here
+    
+    # Shutdown (if needed)
+    logger.info("=== Shutting down ===")
 
+
+# ── Import all models so SQLAlchemy registers them before create_all ──────────
+from app.models import user as _user_model          # noqa: F401
+from app.models import venue as _venue_model        # noqa: F401
+from app.models import match as _match_model        # noqa: F401
+from app.models import voucher as _voucher_model    # noqa: F401
+from app.models import waitlist as _waitlist_model  # noqa: F401
+from app.models import activity as _activity_model  # noqa: F401
+
+
+
+# ── Create all tables (idempotent) ────────────────────────────────────────────
+Base.metadata.create_all(bind=engine)
+ensure_dev_schema()  # add missing columns to existing SQLite DBs
+
+# ── Ensure upload directories exist ──────────────────────────────────────────
+# Path(settings.UPLOAD_DIR).mkdir(parents=True, exist_ok=True)
+# Path(settings.UPLOAD_DIR, "listings").mkdir(parents=True, exist_ok=True)
+
+app = FastAPI(
+    title=settings.APP_NAME,
+    version="2.0.0",
+    description="Champion Circuit API — Sports + Esports + Vouchers",
+    docs_url="/docs",
+    redoc_url="/redoc",
+    lifespan=lifespan,
+)
 
 
 app.add_middleware(
