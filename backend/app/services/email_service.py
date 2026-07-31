@@ -114,7 +114,16 @@ class SESEmailService:
 
             # Initialize Jinja2 environment for email templates
             templates_dir = Path(__file__).parent.parent / "templates" / "email"
+            
+            # Log absolute path for debugging
+            abs_templates_dir = templates_dir.absolute()
+            logger.info(f"Looking for email templates at: {abs_templates_dir}")
+            
             if templates_dir.exists():
+                # List templates found
+                template_files = list(templates_dir.glob("*.html"))
+                logger.info(f"Found {len(template_files)} template files: {[t.name for t in template_files]}")
+                
                 self._jinja_env = Environment(
                     loader=FileSystemLoader(str(templates_dir)),
                     autoescape=True,
@@ -123,7 +132,10 @@ class SESEmailService:
                 )
                 logger.info(f"Jinja2 environment initialized with template dir: {templates_dir}")
             else:
-                logger.warning(f"Email templates directory not found: {templates_dir}")
+                logger.error(f"Email templates directory NOT FOUND: {abs_templates_dir}")
+                logger.error(f"__file__ resolves to: {Path(__file__).absolute()}")
+                logger.error(f"parent: {Path(__file__).parent.absolute()}")
+                logger.error(f"parent.parent: {Path(__file__).parent.parent.absolute()}")
                 self._jinja_env = None
 
             self._initialized = True
