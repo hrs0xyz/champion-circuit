@@ -365,15 +365,16 @@ function ParticipantsList({ tournamentId, participants, onChanged, onMsg }: {
               fps: 10,
               qrbox: { width: 250, height: 250 }
             },
-            (decodedText: string) => {
-              // QR code scanned successfully
-              setCode(decodedText);
-              void checkIn({ code: decodedText });
+            async (decodedText: string) => {
+              // QR code scanned successfully - stop scanner first
+              if (html5QrCode) {
+                await html5QrCode.stop().catch(() => {});
+              }
               setShowScanner(false);
               setScanning(false);
-              if (html5QrCode) {
-                html5QrCode.stop().catch(() => {});
-              }
+              setCode(decodedText);
+              // Now perform check-in
+              await checkIn({ code: decodedText });
             },
             () => {
               // Scan error (ignore, happens frequently during scanning)
