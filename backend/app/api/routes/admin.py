@@ -695,16 +695,23 @@ def staff_check_in(
 @router.post("/staff/tournaments/{tournament_id}/remind-checkin")
 def staff_remind_checkin(
     tournament_id: int,
+    payload: dict = None,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """Admin-triggered nudge to everyone not yet checked in (no scheduler)."""
+    """
+    Send check-in reminder to participants.
+    Optional payload: {"user_ids": [1, 2, 3]} to remind specific users only.
+    If no payload or user_ids not provided, reminds all non-checked-in participants.
+    """
     if not is_tournament_admin(db, current_user, tournament_id):
         raise HTTPException(status_code=403, detail="Not assigned to this tournament")
     t = db.get(Tournament, tournament_id)
     if not t:
         raise HTTPException(status_code=404, detail="Tournament not found")
-    notified = remind_checkin(db, t)
+    
+    user_ids = payload.get("user_ids") if payload else None
+    notified = remind_checkin(db, t, user_ids=user_ids)
     return {"notified": notified}
 
 

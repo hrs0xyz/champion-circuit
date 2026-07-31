@@ -2089,3 +2089,46 @@ def serialize_news(article: NewsArticle) -> dict:
         "published_at": article.published_at,
         "view_count": article.view_count,
     }
+
+
+def remind_checkin(db: Session, tournament: Tournament, user_ids: list[int] | None = None) -> int:
+    """
+    Send check-in reminder emails to non-checked-in participants.
+    If user_ids is provided, only send to those specific users.
+    Returns the number of participants notified.
+    """
+    from app.services.email import send_checkin_reminder_email
+    
+    query = db.query(TournamentRegistration).filter(
+        TournamentRegistration.tournament_id == tournament.id,
+        TournamentRegistration.checked_in_at == "",  # Not checked in
+    )
+    
+    # Filter by specific user IDs if provided
+    if user_ids:
+        query = query.filter(TournamentRegistration.user_id.in_(user_ids))
+    
+    registrations = query.all()
+    
+    notified = 0
+    for reg in registrations:
+        user = db.get(User, reg.user_id)
+        if not user or not user.email:
+            continue
+        
+        try:
+            send_checkin_reminder_email(
+                to_email=user.email,
+                display=user.display_name or user.username,
+                tournament_name=tournament.name,
+                slug=tournament.slug,
+                checkin_code=reg.checkin_code,
+                when=tournament.starts_at or "",
+                venue_name=tournament.venue.name if tournament.venue else "",
+            )
+            notified += 1
+        except Exception:
+            # Silent fail for individual emails
+            pass
+    
+    return notified

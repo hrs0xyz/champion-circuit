@@ -50,6 +50,8 @@ export function MatchAdminPage() {
   const [tab, setTab] = useState<'participants' | 'matches' | 'record'>('participants');
   const [msg, setMsg] = useState('');
   const [loading, setLoading] = useState(true);
+  const [showRemindDialog, setShowRemindDialog] = useState(false);
+  const [selectedUsers, setSelectedUsers] = useState<number[]>([]);
 
   useEffect(() => {
     if (!user) { navigate('/partner-login', { replace: true }); return; }
@@ -93,11 +95,23 @@ export function MatchAdminPage() {
   }
 
   async function remind() {
+    setShowRemindDialog(true);
+  }
+
+  async function sendReminders() {
     if (!selected) return;
     try {
-      const res = await ccApi.remindCheckin(selected.id);
+      const payload = selectedUsers.length > 0 ? { user_ids: selectedUsers } : undefined;
+      const res = await staffReq<{ notified: number }>(
+        `/api/staff/tournaments/${selected.id}/remind-checkin`,
+        { method: 'POST', body: JSON.stringify(payload || {}) }
+      );
       setMsg(`Check-in reminder sent to ${res.notified} participant(s).`);
-    } catch (e) { setMsg(e instanceof ApiError ? e.message : 'Failed.'); }
+      setShowRemindDialog(false);
+      setSelectedUsers([]);
+    } catch (e) { 
+      setMsg(e instanceof ApiError ? e.message : 'Failed.'); 
+    }
   }
 
   // Non-staff are redirected by the effect above — render nothing meanwhile.
@@ -204,6 +218,83 @@ export function MatchAdminPage() {
           </>
         )}
       </main>
+
+      {/* Remind Check-in Dialog */}
+      {showRemindDialog && selected && (
+        <div className="modal-overlay" onClick={() => setShowRemindDialog(false)}>
+          <div className="modal-content" style={{ maxWidth: 600 }} onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2 className="modal-title">Send Check-in Reminders</h2>
+              <button type="button" className="modal-close" onClick={() => setShowRemindDialog(false)}>×</button>
+            </div>
+            <div className="modal-body">
+              <p style={{ marginBottom: 16, color: '#d4d4d8' }}>
+                Select participants to remind, or click "Remind All" to notify all non-checked-in participants.
+              </p>
+              
+              <div style={{ marginBottom: 16 }}>
+                <button 
+                  type="button" 
+                  className="btn btn-secondary btn-sm" 
+                  onClick={() => {
+                    const notCheckedIn = participants.filter(p => !p.checked_in_at).map(p => p.user_id);
+                    setSelectedUsers(notCheckedIn);
+                  }}
+                  style={{ marginRight: 8 }}
+                >
+                  Select All Non-Checked-In
+                </button>
+                <button 
+                  type="button" 
+                  className="btn btn-ghost btn-sm" 
+                  onClick={() => setSelectedUsers([])}
+                >
+                  Clear Selection
+                </button>
+              </div>
+
+              <div style={{ maxHeight: 300, overflowY: 'auto', border: '1px solid #2a3544', borderRadius: 8, padding: 12 }}>
+                {participants.filter(p => !p.checked_in_at).length === 0 ? (
+                  <p className="muted">All participants have checked in! 🎉</p>
+                ) : (
+                  participants.filter(p => !p.checked_in_at).map((p) => (
+                    <label key={p.user_id} style={{ display: 'flex', alignItems: 'center', padding: '8px 12px', cursor: 'pointer', borderRadius: 6, background: selectedUsers.includes(p.user_id) ? '#0abfbc22' : 'transparent' }}>
+                      <input 
+                        type="checkbox" 
+                        checked={selectedUsers.includes(p.user_id)}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setSelectedUsers([...selectedUsers, p.user_id]);
+                          } else {
+                            setSelectedUsers(selectedUsers.filter(id => id !== p.user_id));
+                          }
+                        }}
+                        style={{ marginRight: 12 }}
+                      />
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontWeight: 500 }}>@{p.username}</div>
+                        <div style={{ fontSize: 13, color: '#a3a3a3' }}>{p.name || 'No name'} · {p.phone || 'No phone'}</div>
+                      </div>
+                      <span className="staff-badge">{p.payment_status}</span>
+                    </label>
+                  ))
+                )}
+              </div>
+            </div>
+            <div className="modal-footer">
+              <button type="button" className="btn btn-ghost" onClick={() => setShowRemindDialog(false)}>Cancel</button>
+              <button 
+                type="button" 
+                className="btn btn-primary" 
+                onClick={() => void sendReminders()}
+                disabled={participants.filter(p => !p.checked_in_at).length === 0}
+              >
+                {selectedUsers.length > 0 ? `Remind ${selectedUsers.length} Selected` : 'Remind All Non-Checked-In'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -239,6 +330,7 @@ function ParticipantsList({ tournamentId, participants, onChanged, onMsg }: {
 
       <div className="staff-inline-form" style={{ marginBottom: 16 }}>
         <input
+          id="checkin-code-input"
           className="auth-input" style={{ flex: 1 }}
           placeholder="Scan QR or type check-in code…"
           value={code}
@@ -248,6 +340,17 @@ function ParticipantsList({ tournamentId, participants, onChanged, onMsg }: {
         <button type="button" className="btn btn-primary btn-sm" disabled={!code.trim() || busy}
           onClick={() => void checkIn({ code: code.trim() })}>
           Check in
+        </button>
+        <button 
+          type="button" 
+          className="btn btn-secondary btn-sm" 
+          onClick={() => {
+            // Scroll to the input when scanner button is clicked
+            document.getElementById('checkin-code-input')?.focus();
+            document.getElementById('checkin-code-input')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          }}
+        >
+          📷 Show Scanner
         </button>
       </div>
 

@@ -257,3 +257,37 @@ def send_fixture_email(
     except Exception as e:
         logger.error(f"Unexpected error sending fixture email: {e}", exc_info=True)
         return False
+
+
+
+def send_checkin_reminder_email(
+    to_email: str, display: str, tournament_name: str, slug: str,
+    checkin_code: str, when: str = "", venue_name: str = "",
+) -> bool:
+    """Send check-in reminder email using AWS SES."""
+    email_service = get_email_service()
+    
+    try:
+        email_service.send_template_email(
+            to_email=to_email,
+            subject=f"⏰ Check-in Reminder — {tournament_name}",
+            template_name="checkin_reminder.html",
+            context={
+                "display_name": display,
+                "tournament_name": tournament_name,
+                "slug": slug,
+                "checkin_code": checkin_code,
+                "when": when,
+                "venue_name": venue_name,
+            },
+        )
+        logger.info(f"Check-in reminder sent to {to_email} for {tournament_name}")
+        return True
+    except EmailServiceError as e:
+        logger.error(f"Failed to send check-in reminder to {to_email}: {e}")
+        if settings.is_development:
+            logger.info(f"[DEV CHECKIN REMINDER] {to_email} — {tournament_name} — Code: {checkin_code}")
+        return False
+    except Exception as e:
+        logger.error(f"Unexpected error sending check-in reminder: {e}", exc_info=True)
+        return False

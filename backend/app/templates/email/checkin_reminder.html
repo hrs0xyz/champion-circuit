@@ -1,0 +1,123 @@
+{% extends "email/base.html" %}
+
+{% block content %}
+<!-- Hero greeting -->
+<table width="100%" cellpadding="0" cellspacing="0" border="0">
+  <tr>
+    <td align="center" style="padding: 24px 20px;">
+      <h1 style="margin: 0 0 12px 0; font-size: 28px; font-weight: 700; color: #fff; line-height: 1.3;">
+        ⏰ Check-in Reminder
+      </h1>
+      <p style="margin: 0; font-size: 16px; color: #a3a3a3; line-height: 1.5;">
+        Don't forget to check in for your upcoming tournament!
+      </p>
+    </td>
+  </tr>
+</table>
+
+<!-- Tournament info card -->
+<table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin: 0 0 24px 0;">
+  <tr>
+    <td style="padding: 0 20px;">
+      <table width="100%" cellpadding="0" cellspacing="0" border="0" 
+        style="background: linear-gradient(135deg, #1a2332 0%, #0d1117 100%); 
+               border: 1px solid #2a3544; border-radius: 12px; overflow: hidden;">
+        <tr>
+          <td style="padding: 24px;">
+            <h2 style="margin: 0 0 16px 0; font-size: 22px; font-weight: 700; color: #0abfbc;">
+              {{ tournament_name }}
+            </h2>
+            
+            {% if when %}
+            <p style="margin: 0 0 8px 0; font-size: 15px; color: #d4d4d8; line-height: 1.6;">
+              📅 <strong>Starts:</strong> {{ when }}
+            </p>
+            {% endif %}
+            
+            {% if venue_name %}
+            <p style="margin: 0 0 8px 0; font-size: 15px; color: #d4d4d8; line-height: 1.6;">
+              📍 <strong>Venue:</strong> {{ venue_name }}
+            </p>
+            {% endif %}
+          </td>
+        </tr>
+      </table>
+    </td>
+  </tr>
+</table>
+
+<!-- Check-in code -->
+<table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin: 0 0 24px 0;">
+  <tr>
+    <td style="padding: 0 20px;">
+      <table width="100%" cellpadding="0" cellspacing="0" border="0" 
+        style="background: linear-gradient(135deg, #0abfbc22 0%, #0abfbc11 100%); 
+               border: 2px solid #0abfbc; border-radius: 12px;">
+        <tr>
+          <td align="center" style="padding: 24px;">
+            <p style="margin: 0 0 12px 0; font-size: 14px; color: #a3a3a3; text-transform: uppercase; letter-spacing: 1px;">
+              Your Check-in Code
+            </p>
+            <p style="margin: 0 0 16px 0; font-size: 48px; font-weight: 700; color: #0abfbc; font-family: 'Courier New', monospace; letter-spacing: 4px;">
+              {{ checkin_code }}
+            </p>
+            <p style="margin: 0; font-size: 14px; color: #d4d4d8; line-height: 1.5;">
+              Show this code to the tournament admin or scan your QR code
+            </p>
+          </td>
+        </tr>
+      </table>
+    </td>
+  </tr>
+</table>
+
+<!-- Instructions -->
+<table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin: 0 0 24px 0;">
+  <tr>
+    <td style="padding: 0 20px;">
+      <h3 style="margin: 0 0 16px 0; font-size: 18px; font-weight: 600; color: #fff;">
+        How to Check In
+      </h3>
+      <ol style="margin: 0; padding-left: 20px; color: #d4d4d8; font-size: 15px; line-height: 1.8;">
+        <li style="margin-bottom: 8px;">Arrive at the venue before the tournament starts</li>
+        <li style="margin-bottom: 8px;">Find the tournament admin desk</li>
+        <li style="margin-bottom: 8px;">Show your check-in code or QR code from your profile</li>
+        <li style="margin-bottom: 8px;">Wait for confirmation and further instructions</li>
+      </ol>
+    </td>
+  </tr>
+</table>
+
+<!-- CTA -->
+<table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin: 0 0 32px 0;">
+  <tr>
+    <td align="center" style="padding: 0 20px;">
+      <a href="https://www.championcircuit.com/tournaments/{{ slug }}" 
+         style="display: inline-block; padding: 14px 32px; 
+                background: linear-gradient(135deg, #0abfbc 0%, #089a98 100%); 
+                color: #000; text-decoration: none; font-size: 16px; font-weight: 600; 
+                border-radius: 8px; text-align: center;">
+        View Tournament Details →
+      </a>
+    </td>
+  </tr>
+</table>
+
+<!-- Warning notice -->
+<table width="100%" cellpadding="0" cellspacing="0" border="0">
+  <tr>
+    <td style="padding: 0 20px;">
+      <table width="100%" cellpadding="0" cellspacing="0" border="0" 
+        style="background: #facc1522; border-left: 4px solid #facc15; border-radius: 8px;">
+        <tr>
+          <td style="padding: 16px 20px;">
+            <p style="margin: 0; font-size: 14px; color: #fef08a; line-height: 1.6;">
+              ⚠️ <strong>Important:</strong> Participants who don't check in may be removed from the tournament to allow waitlisted players to join.
+            </p>
+          </td>
+        </tr>
+      </table>
+    </td>
+  </tr>
+</table>
+{% endblock %}
