@@ -52,6 +52,8 @@ export function MatchAdminPage() {
   const [loading, setLoading] = useState(true);
   const [showRemindDialog, setShowRemindDialog] = useState(false);
   const [selectedUsers, setSelectedUsers] = useState<number[]>([]);
+  const [showScanner, setShowScanner] = useState(false);
+  const [scanError, setScanError] = useState('');
 
   useEffect(() => {
     if (!user) { navigate('/partner-login', { replace: true }); return; }
@@ -222,17 +224,17 @@ export function MatchAdminPage() {
       {/* Remind Check-in Dialog */}
       {showRemindDialog && selected && (
         <div className="modal-overlay" onClick={() => setShowRemindDialog(false)}>
-          <div className="modal-content" style={{ maxWidth: 600 }} onClick={(e) => e.stopPropagation()}>
+          <div className="modal-content" style={{ maxWidth: 700 }} onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
-              <h2 className="modal-title">Send Check-in Reminders</h2>
+              <h2 className="modal-title">📧 Send Check-in Reminders</h2>
               <button type="button" className="modal-close" onClick={() => setShowRemindDialog(false)}>×</button>
             </div>
             <div className="modal-body">
               <p style={{ marginBottom: 16, color: '#d4d4d8' }}>
-                Select participants to remind, or click "Remind All" to notify all non-checked-in participants.
+                Select participants who need a check-in reminder email. The email will include their check-in code and tournament details.
               </p>
               
-              <div style={{ marginBottom: 16 }}>
+              <div style={{ marginBottom: 16, display: 'flex', gap: 8 }}>
                 <button 
                   type="button" 
                   className="btn btn-secondary btn-sm" 
@@ -240,46 +242,81 @@ export function MatchAdminPage() {
                     const notCheckedIn = participants.filter(p => !p.checked_in_at).map(p => p.user_id);
                     setSelectedUsers(notCheckedIn);
                   }}
-                  style={{ marginRight: 8 }}
                 >
-                  Select All Non-Checked-In
+                  ✓ Select All Non-Checked-In ({participants.filter(p => !p.checked_in_at).length})
                 </button>
                 <button 
                   type="button" 
                   className="btn btn-ghost btn-sm" 
                   onClick={() => setSelectedUsers([])}
                 >
-                  Clear Selection
+                  ✕ Clear Selection
                 </button>
               </div>
 
-              <div style={{ maxHeight: 300, overflowY: 'auto', border: '1px solid #2a3544', borderRadius: 8, padding: 12 }}>
-                {participants.filter(p => !p.checked_in_at).length === 0 ? (
-                  <p className="muted">All participants have checked in! 🎉</p>
-                ) : (
-                  participants.filter(p => !p.checked_in_at).map((p) => (
-                    <label key={p.user_id} style={{ display: 'flex', alignItems: 'center', padding: '8px 12px', cursor: 'pointer', borderRadius: 6, background: selectedUsers.includes(p.user_id) ? '#0abfbc22' : 'transparent' }}>
-                      <input 
-                        type="checkbox" 
-                        checked={selectedUsers.includes(p.user_id)}
-                        onChange={(e) => {
-                          if (e.target.checked) {
-                            setSelectedUsers([...selectedUsers, p.user_id]);
-                          } else {
-                            setSelectedUsers(selectedUsers.filter(id => id !== p.user_id));
-                          }
-                        }}
-                        style={{ marginRight: 12 }}
-                      />
-                      <div style={{ flex: 1 }}>
-                        <div style={{ fontWeight: 500 }}>@{p.username}</div>
-                        <div style={{ fontSize: 13, color: '#a3a3a3' }}>{p.name || 'No name'} · {p.phone || 'No phone'}</div>
-                      </div>
-                      <span className="staff-badge">{p.payment_status}</span>
-                    </label>
-                  ))
-                )}
-              </div>
+              {participants.filter(p => !p.checked_in_at).length === 0 ? (
+                <div style={{ padding: 32, textAlign: 'center', background: '#0d1117', borderRadius: 8 }}>
+                  <p style={{ fontSize: 48, margin: 0 }}>🎉</p>
+                  <p style={{ margin: '12px 0 0 0', color: '#0abfbc', fontWeight: 600 }}>All participants have checked in!</p>
+                </div>
+              ) : (
+                <div style={{ maxHeight: 400, overflowY: 'auto', border: '1px solid #2a3544', borderRadius: 8 }}>
+                  <table className="staff-table" style={{ marginBottom: 0 }}>
+                    <thead>
+                      <tr>
+                        <th style={{ width: 40 }}>
+                          <input 
+                            type="checkbox"
+                            checked={selectedUsers.length === participants.filter(p => !p.checked_in_at).length && participants.filter(p => !p.checked_in_at).length > 0}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setSelectedUsers(participants.filter(p => !p.checked_in_at).map(p => p.user_id));
+                              } else {
+                                setSelectedUsers([]);
+                              }
+                            }}
+                          />
+                        </th>
+                        <th>Username</th>
+                        <th>Name</th>
+                        <th>Phone</th>
+                        <th>Payment</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {participants.filter(p => !p.checked_in_at).map((p) => (
+                        <tr key={p.user_id} style={{ background: selectedUsers.includes(p.user_id) ? '#0abfbc11' : 'transparent' }}>
+                          <td>
+                            <input 
+                              type="checkbox" 
+                              checked={selectedUsers.includes(p.user_id)}
+                              onChange={(e) => {
+                                if (e.target.checked) {
+                                  setSelectedUsers([...selectedUsers, p.user_id]);
+                                } else {
+                                  setSelectedUsers(selectedUsers.filter(id => id !== p.user_id));
+                                }
+                              }}
+                            />
+                          </td>
+                          <td>@{p.username}</td>
+                          <td>{p.name || '—'}</td>
+                          <td style={{ fontSize: 13 }}>{p.phone || '—'}</td>
+                          <td><span className={`staff-badge${p.payment_status === 'paid' ? ' staff-badge--active' : ''}`}>{p.payment_status}</span></td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+
+              {selectedUsers.length > 0 && (
+                <div style={{ marginTop: 16, padding: 12, background: '#0abfbc22', border: '1px solid #0abfbc', borderRadius: 8 }}>
+                  <p style={{ margin: 0, fontSize: 14, color: '#d4d4d8' }}>
+                    ✉️ <strong>{selectedUsers.length}</strong> participant{selectedUsers.length !== 1 ? 's' : ''} will receive a check-in reminder email
+                  </p>
+                </div>
+              )}
             </div>
             <div className="modal-footer">
               <button type="button" className="btn btn-ghost" onClick={() => setShowRemindDialog(false)}>Cancel</button>
@@ -289,7 +326,9 @@ export function MatchAdminPage() {
                 onClick={() => void sendReminders()}
                 disabled={participants.filter(p => !p.checked_in_at).length === 0}
               >
-                {selectedUsers.length > 0 ? `Remind ${selectedUsers.length} Selected` : 'Remind All Non-Checked-In'}
+                {selectedUsers.length > 0 
+                  ? `📧 Send to ${selectedUsers.length} Selected` 
+                  : `📧 Send to All ${participants.filter(p => !p.checked_in_at).length} Non-Checked-In`}
               </button>
             </div>
           </div>
@@ -307,6 +346,50 @@ function ParticipantsList({ tournamentId, participants, onChanged, onMsg }: {
 }) {
   const [code, setCode] = useState('');
   const [busy, setBusy] = useState(false);
+  const [showScanner, setShowScanner] = useState(false);
+  const [scanning, setScanning] = useState(false);
+
+  useEffect(() => {
+    let html5QrCode: any = null;
+
+    if (showScanner && !scanning) {
+      setScanning(true);
+      // Dynamically import and initialize scanner
+      import('html5-qrcode').then(({ Html5Qrcode }) => {
+        html5QrCode = new Html5Qrcode('qr-reader');
+        
+        html5QrCode.start(
+          { facingMode: 'environment' }, // Use back camera
+          {
+            fps: 10,
+            qrbox: { width: 250, height: 250 }
+          },
+          (decodedText: string) => {
+            // QR code scanned successfully
+            setCode(decodedText);
+            void checkIn({ code: decodedText });
+            setShowScanner(false);
+            if (html5QrCode) {
+              html5QrCode.stop().catch(() => {});
+            }
+          },
+          () => {
+            // Scan error (ignore, happens frequently)
+          }
+        ).catch((err: Error) => {
+          onMsg(`Camera error: ${err.message}. Please allow camera access.`);
+          setShowScanner(false);
+          setScanning(false);
+        });
+      });
+    }
+
+    return () => {
+      if (html5QrCode) {
+        html5QrCode.stop().catch(() => {});
+      }
+    };
+  }, [showScanner]);
 
   async function checkIn(payload: { code?: string; user_id?: number }) {
     setBusy(true);
@@ -344,15 +427,21 @@ function ParticipantsList({ tournamentId, participants, onChanged, onMsg }: {
         <button 
           type="button" 
           className="btn btn-secondary btn-sm" 
-          onClick={() => {
-            // Scroll to the input when scanner button is clicked
-            document.getElementById('checkin-code-input')?.focus();
-            document.getElementById('checkin-code-input')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-          }}
+          onClick={() => setShowScanner(!showScanner)}
         >
-          📷 Show Scanner
+          {showScanner ? '✕ Close Scanner' : '📷 Show Scanner'}
         </button>
       </div>
+
+      {/* QR Scanner */}
+      {showScanner && (
+        <div style={{ marginBottom: 16, padding: 16, background: '#0d1117', border: '1px solid #2a3544', borderRadius: 8 }}>
+          <p style={{ marginBottom: 12, color: '#d4d4d8', textAlign: 'center' }}>
+            Point your camera at the participant's QR code
+          </p>
+          <div id="qr-reader" style={{ width: '100%' }}></div>
+        </div>
+      )}
 
       <div className="staff-table-wrap">
         <table className="staff-table">
