@@ -23,14 +23,48 @@ export function EsportsBrowsePage() {
   const [tab, setTab] = useState<Tab>('all');
   const [tournaments, setTournaments] = useState<Tournament[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [total, setTotal] = useState(0);
+  const [hasMore, setHasMore] = useState(false);
+  const [page, setPage] = useState(0);
+  const ITEMS_PER_PAGE = 12;
 
   useEffect(() => {
     setLoading(true);
-    ccApi.tournaments(tab !== 'all' ? { status_filter: tab } : {})
-      .then(setTournaments)
-      .catch(() => setTournaments([]))
+    setPage(0);
+    ccApi.tournaments(tab !== 'all' ? { status_filter: tab, skip: 0, limit: ITEMS_PER_PAGE } : { skip: 0, limit: ITEMS_PER_PAGE })
+      .then((response) => {
+        setTournaments(response.items);
+        setTotal(response.total);
+        setHasMore(response.has_more);
+      })
+      .catch(() => {
+        setTournaments([]);
+        setTotal(0);
+        setHasMore(false);
+      })
       .finally(() => setLoading(false));
   }, [tab]);
+
+  const loadMore = async () => {
+    if (loadingMore || !hasMore) return;
+    setLoadingMore(true);
+    const nextPage = page + 1;
+    try {
+      const response = await ccApi.tournaments(
+        tab !== 'all' 
+          ? { status_filter: tab, skip: nextPage * ITEMS_PER_PAGE, limit: ITEMS_PER_PAGE } 
+          : { skip: nextPage * ITEMS_PER_PAGE, limit: ITEMS_PER_PAGE }
+      );
+      setTournaments((prev) => [...prev, ...response.items]);
+      setHasMore(response.has_more);
+      setPage(nextPage);
+    } catch {
+      // Silent fail
+    } finally {
+      setLoadingMore(false);
+    }
+  };
 
   return (
     <section className="section section-esports">
@@ -133,6 +167,20 @@ export function EsportsBrowsePage() {
                 </div>
               </div>
             ))}
+          </div>
+        )}
+
+        {/* Pagination controls */}
+        {!loading && tournaments.length > 0 && hasMore && (
+          <div style={{ display: 'flex', justifyContent: 'center', marginTop: 32 }}>
+            <button 
+              type="button" 
+              className="btn btn-secondary" 
+              onClick={() => void loadMore()}
+              disabled={loadingMore}
+            >
+              {loadingMore ? 'Loading...' : `Load more (${tournaments.length} of ${total})`}
+            </button>
           </div>
         )}
 
