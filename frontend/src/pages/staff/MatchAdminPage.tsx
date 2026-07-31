@@ -356,37 +356,49 @@ function ParticipantsList({ tournamentId, participants, onChanged, onMsg }: {
       setScanning(true);
       // Dynamically import and initialize scanner
       import('html5-qrcode').then(({ Html5Qrcode }) => {
-        html5QrCode = new Html5Qrcode('qr-reader');
-        
-        html5QrCode.start(
-          { facingMode: 'environment' }, // Use back camera
-          {
-            fps: 10,
-            qrbox: { width: 250, height: 250 }
-          },
-          (decodedText: string) => {
-            // QR code scanned successfully
-            setCode(decodedText);
-            void checkIn({ code: decodedText });
-            setShowScanner(false);
-            if (html5QrCode) {
-              html5QrCode.stop().catch(() => {});
+        try {
+          html5QrCode = new Html5Qrcode('qr-reader');
+          
+          html5QrCode.start(
+            { facingMode: 'environment' }, // Use back camera
+            {
+              fps: 10,
+              qrbox: { width: 250, height: 250 }
+            },
+            (decodedText: string) => {
+              // QR code scanned successfully
+              setCode(decodedText);
+              void checkIn({ code: decodedText });
+              setShowScanner(false);
+              setScanning(false);
+              if (html5QrCode) {
+                html5QrCode.stop().catch(() => {});
+              }
+            },
+            () => {
+              // Scan error (ignore, happens frequently during scanning)
             }
-          },
-          () => {
-            // Scan error (ignore, happens frequently)
-          }
-        ).catch((err: Error) => {
-          onMsg(`Camera error: ${err.message}. Please allow camera access.`);
+          ).catch((err: Error) => {
+            onMsg(`Camera error: ${err.message}. Please allow camera access.`);
+            setShowScanner(false);
+            setScanning(false);
+          });
+        } catch (err) {
+          onMsg('Failed to initialize scanner. Please try again.');
           setShowScanner(false);
           setScanning(false);
-        });
+        }
+      }).catch((err) => {
+        onMsg('Failed to load scanner library.');
+        setShowScanner(false);
+        setScanning(false);
       });
     }
 
     return () => {
       if (html5QrCode) {
         html5QrCode.stop().catch(() => {});
+        setScanning(false);
       }
     };
   }, [showScanner]);
