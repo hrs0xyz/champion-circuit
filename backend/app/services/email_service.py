@@ -196,6 +196,13 @@ class SESEmailService:
         print(f"[_render_template] self.jinja_env is None: {self.jinja_env is None}")
         print(f"[_render_template] self._initialized: {self._initialized}")
         
+        if self.jinja_env:
+            try:
+                available = self.jinja_env.list_templates()
+                print(f"[_render_template] Jinja2 lists {len(available)} templates: {available}")
+            except Exception as e:
+                print(f"[_render_template] ERROR listing templates: {e}")
+        
         if not self.jinja_env:
             # Log detailed path information when env is not initialized
             templates_dir = Path(__file__).parent.parent / "templates" / "email"
