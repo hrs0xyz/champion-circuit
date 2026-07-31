@@ -210,6 +210,7 @@ class Tournament(Base):
         "TournamentStage", back_populates="tournament",
         order_by="TournamentStage.stage_order", cascade="all, delete-orphan"
     )
+    venue: Mapped["Venue"] = relationship("Venue", foreign_keys=[venue_id])
 
 
 # ── Tournament stages (multi-venue support) ───────────────────────────────────
