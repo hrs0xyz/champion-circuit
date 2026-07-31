@@ -45,6 +45,29 @@ async def startup_event():
     """Initialize services and verify critical resources on startup."""
     logger.info("=== Champion Circuit API Starting Up ===")
     
+    # Log current working directory and file structure
+    import os
+    cwd = os.getcwd()
+    logger.info(f"Current working directory: {cwd}")
+    
+    # Check templates directory
+    from pathlib import Path
+    templates_dir = Path(__file__).parent / "templates" / "email"
+    abs_templates = templates_dir.absolute()
+    logger.info(f"Templates directory path: {abs_templates}")
+    logger.info(f"Templates directory exists: {templates_dir.exists()}")
+    
+    if templates_dir.exists():
+        template_files = sorted([f.name for f in templates_dir.glob("*.html")])
+        logger.info(f"Found {len(template_files)} templates: {template_files}")
+    else:
+        logger.error(f"Templates directory NOT FOUND at: {abs_templates}")
+        # Try alternate locations
+        alt_path1 = Path(cwd) / "app" / "templates" / "email"
+        alt_path2 = Path(cwd) / "backend" / "app" / "templates" / "email"
+        logger.info(f"Checking alternate path 1: {alt_path1} exists={alt_path1.exists()}")
+        logger.info(f"Checking alternate path 2: {alt_path2} exists={alt_path2.exists()}")
+    
     # Initialize email service and verify templates
     try:
         email_service = get_email_service()
@@ -55,6 +78,7 @@ async def startup_event():
         logger.error(f"❌ Email service initialization failed: {e}", exc_info=True)
     
     logger.info("=== Startup Complete ===")
+
 
 
 app.add_middleware(
