@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field, ConfigDict
+from pydantic import BaseModel, Field, ConfigDict, field_validator
 from typing import List, Optional
 from datetime import datetime
 
@@ -164,12 +164,34 @@ class RosterEntry(BaseModel):
     name: str = Field(min_length=1, max_length=120)
     phone: str = Field(min_length=1, max_length=20)
 
+    @field_validator("phone")
+    @classmethod
+    def validate_phone(cls, value: str) -> str:
+        if not value:
+            raise ValueError("Phone number is required")
+        # Strip non-numeric characters
+        phone_digits = ''.join(filter(str.isdigit, value))
+        if len(phone_digits) != 10:
+            raise ValueError("Phone number must be exactly 10 digits")
+        return phone_digits
+
 
 class TournamentRegisterPayload(BaseModel):
     team_id: int = 0
     contact_name: str = Field(default="", max_length=120)
     contact_phone: str = Field(default="", max_length=20)
     roster: List[RosterEntry] = Field(default_factory=list)
+
+    @field_validator("contact_phone")
+    @classmethod
+    def validate_contact_phone(cls, value: str) -> str:
+        if not value:
+            raise ValueError("Contact phone number is required")
+        # Strip non-numeric characters
+        phone_digits = ''.join(filter(str.isdigit, value))
+        if len(phone_digits) != 10:
+            raise ValueError("Contact phone number must be exactly 10 digits")
+        return phone_digits
 
 
 class GenerateBracketPayload(BaseModel):

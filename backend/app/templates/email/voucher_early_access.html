@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+
+{% block title %}Your Early-Access Voucher - Champion Circuit{% endblock %}
+
+{% block preheader %}Your Champion Circuit early-access voucher code: {{ code }}{% endblock %}
+
+{% block content %}
+<table width="100%" cellpadding="0" cellspacing="0" border="0">
+    <!-- Heading -->
+    <tr>
+        <td style="padding-bottom: 6px;">
+            <h1 style="margin: 0; font-size: 22px; font-weight: 700; color: #ffffff;">
+                You're in. 🎉
+            </h1>
+        </td>
+    </tr>
+
+    <!-- Intro -->
+    <tr>
+        <td style="padding-bottom: 28px;">
+            <p style="margin: 0; font-size: 15px; color: rgba(232, 244, 244, 0.6); line-height: 1.6;">
+                Here's your early-access voucher for Champion Circuit.
+            </p>
+        </td>
+    </tr>
+
+    <!-- Voucher Card -->
+    <tr>
+        <td style="padding-bottom: 24px;">
+            <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(10, 191, 188, 0.3); border-radius: 12px;">
+                <tr>
+                    <td style="padding: 24px;">
+                        <table width="100%" cellpadding="0" cellspacing="0" border="0">
+                            <tr>
+                                <td style="padding-bottom: 6px;">
+                                    <p style="margin: 0; font-size: 11px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: rgba(10, 191, 188, 0.7);">
+                                        Your Voucher Code
+                                    </p>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td style="padding-bottom: 12px;">
+                                    <p style="margin: 0; font-size: 32px; font-weight: 800; letter-spacing: 0.2em; color: #ffffff; font-family: 'Courier New', Courier, monospace;">
+                                        {{ code }}
+                                    </p>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td>
+                                    <p style="margin: 0; font-size: 14px; color: rgba(232, 244, 244, 0.7); line-height: 1.5;">
+                                        {{ benefit }}
+                                    </p>
+                                </td>
+                            </tr>
+                        </table>
+                    </td>
+                </tr>
+            </table>
+        </td>
+    </tr>
+
+    <!-- How to Use -->
+    <tr>
+        <td style="padding-bottom: 24px;">
+            <p style="margin: 0; font-size: 14px; color: rgba(232, 244, 244, 0.5); line-height: 1.7;">
+                Use this code when you book your first turf slot or register for a tournament. We'll remind you when we go live.
+            </p>
+        </td>
+    </tr>
+
+    <!-- Info Box -->
+    <tr>
+        <td style="padding: 16px 20px; background: rgba(10, 191, 188, 0.08); border-left: 3px solid #0abfbc; border-radius: 8px;">
+            <p style="margin: 0; font-size: 13px; color: rgba(232, 244, 244, 0.7); line-height: 1.6;">
+                <strong style="color: #0abfbc;">💡 Pro tip:</strong> Save this email or screenshot your code for easy access later.
+            </p>
+        </td>
+    </tr>
+</table>
+{% endblock %}

@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+
+{% block title %}Bracket Published - {{ tournament_name }}{% endblock %}
+
+{% block preheader %}The bracket for {{ tournament_name }} is live. Find your first match!{% endblock %}
+
+{% block content %}
+<table width="100%" cellpadding="0" cellspacing="0" border="0">
+    <!-- Heading -->
+    <tr>
+        <td style="padding-bottom: 10px;">
+            <h1 style="margin: 0; font-size: 26px; font-weight: 800; color: #ffffff; line-height: 1.25;">
+                The bracket is live! ⚔️
+            </h1>
+        </td>
+    </tr>
+
+    <!-- Intro -->
+    <tr>
+        <td style="padding-bottom: 28px;">
+            <p style="margin: 0; font-size: 15px; color: rgba(232, 244, 244, 0.65); line-height: 1.7;">
+                {{ display_name }}, the bracket for <strong style="color: #ffffff;">{{ tournament_name }}</strong> has been published. Find your first match and get ready.
+            </p>
+        </td>
+    </tr>
+
+    <!-- Info Card -->
+    <tr>
+        <td style="padding-bottom: 28px;">
+            <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background: rgba(10, 191, 188, 0.08); border-left: 3px solid #0abfbc; border-radius: 8px;">
+                <tr>
+                    <td style="padding: 16px 20px;">
+                        <table width="100%" cellpadding="0" cellspacing="0" border="0">
+                            <tr>
+                                <td width="32" valign="top" style="padding-right: 12px;">
+                                    <span style="font-size: 24px;">🎯</span>
+                                </td>
+                                <td>
+                                    <p style="margin: 0; font-size: 14px; color: rgba(232, 244, 244, 0.75); line-height: 1.6;">
+                                        <strong style="color: #0abfbc;">Ready to compete?</strong><br>
+                                        Check the bracket to see your opponent, round, and match time. Make sure you're prepared and arrive early.
+                                    </p>
+                                </td>
+                            </tr>
+                        </table>
+                    </td>
+                </tr>
+            </table>
+        </td>
+    </tr>
+
+    <!-- CTA Button -->
+    <tr>
+        <td align="center">
+            <table cellpadding="0" cellspacing="0" border="0">
+                <tr>
+                    <td align="center" style="background-color: #0abfbc; border-radius: 10px;">
+                        <a href="https://championcircuit.com/tournaments/{{ slug }}" 
+                           style="display: inline-block; padding: 14px 32px; color: #060d1a; font-size: 15px; font-weight: 700; text-decoration: none; letter-spacing: 0.02em;">
+                            View Bracket →
+                        </a>
+                    </td>
+                </tr>
+            </table>
+        </td>
+    </tr>
+
+    <!-- Good Luck -->
+    <tr>
+        <td style="padding-top: 28px; text-align: center;">
+            <p style="margin: 0; font-size: 14px; color: rgba(232, 244, 244, 0.5);">
+                Good luck, champion! 🏆
+            </p>
+        </td>
+    </tr>
+</table>
+{% endblock %}

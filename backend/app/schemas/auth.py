@@ -22,6 +22,17 @@ class ProfilePayload(BaseModel):
     ranked_interests: list[str] = Field(default_factory=list)
     bio: str = Field(default="", max_length=600)
 
+    @field_validator("phone")
+    @classmethod
+    def validate_phone(cls, value: str) -> str:
+        if not value:
+            return value
+        # Strip non-numeric characters
+        phone_digits = ''.join(filter(str.isdigit, value))
+        if phone_digits and len(phone_digits) != 10:
+            raise ValueError("Phone number must be exactly 10 digits")
+        return phone_digits
+
 
 class SignupStartRequest(BaseModel):
     username: str = Field(min_length=4, max_length=16)

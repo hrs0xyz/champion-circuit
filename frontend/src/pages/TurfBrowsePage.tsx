@@ -53,8 +53,13 @@ export function TurfBrowsePage() {
   const [venueListings, setVenueListings] = useState<Record<number, VenueListing[]>>({});
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [selectedSport, setSelectedSport] = useState<string>('all');
   const [error, setError] = useState('');
+  const [total, setTotal] = useState(0);
+  const [hasMore, setHasMore] = useState(false);
+  const [page, setPage] = useState(0);
+  const ITEMS_PER_PAGE = 12;
 
   // Auto-set city from user profile ONLY on first page load if:
   // 1. No city is currently saved in localStorage (cities === [])
@@ -78,16 +83,23 @@ export function TurfBrowsePage() {
   }, [user]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
-    Promise.all([ccApi.venues(), ccApi.categories()])
-      .then(([vs, cs]) => {
-        setVenues(vs);
+    setPage(0);
+    const cityQuery = cities.length > 0 ? cities[0] : '';
+    Promise.all([
+      ccApi.venues(cityQuery, 0, ITEMS_PER_PAGE),
+      ccApi.categories()
+    ])
+      .then(([venueResponse, cs]) => {
+        setVenues(venueResponse.items);
+        setTotal(venueResponse.total);
+        setHasMore(venueResponse.has_more);
         setCategories(cs);
         // Task 10.3 — fetch listings for all venues in parallel
-        Promise.allSettled(vs.map((v) => ccApi.venueListings(v.id))).then((results) => {
+        Promise.allSettled(venueResponse.items.map((v) => ccApi.venueListings(v.id))).then((results) => {
           const map: Record<number, VenueListing[]> = {};
           results.forEach((result, idx) => {
             if (result.status === 'fulfilled') {
-              map[vs[idx].id] = result.value;
+              map[venueResponse.items[idx].id] = result.value;
             }
           });
           setVenueListings(map);
@@ -95,13 +107,42 @@ export function TurfBrowsePage() {
       })
       .catch(() => setError('Could not load venues.'))
       .finally(() => setLoading(false));
-  }, []);
+  }, [cities]);
+
+  const loadMore = async () => {
+    if (loadingMore || !hasMore) return;
+    setLoadingMore(true);
+    const nextPage = page + 1;
+    const cityQuery = cities.length > 0 ? cities[0] : '';
+    try {
+      const response = await ccApi.venues(cityQuery, nextPage * ITEMS_PER_PAGE, ITEMS_PER_PAGE);
+      setVenues((prev) => [...prev, ...response.items]);
+      setHasMore(response.has_more);
+      setPage(nextPage);
+      // Fetch listings for new venues
+      Promise.allSettled(response.items.map((v) => ccApi.venueListings(v.id))).then((results) => {
+        setVenueListings((prev) => {
+          const updated = { ...prev };
+          results.forEach((result, idx) => {
+            if (result.status === 'fulfilled') {
+              updated[response.items[idx].id] = result.value;
+            }
+          });
+          return updated;
+        });
+      });
+    } catch {
+      // Silent fail
+    } finally {
+      setLoadingMore(false);
+    }
+  };
 
   // Only show physical + esports categories as sport filters
-  const sportCats = categories.filter((c) => c.type === 'physical' || c.type === 'esports');
+  const sportCats = categories ? categories.filter((c) => c.type === 'physical' || c.type === 'esports') : [];
 
   // Filter venues by city
-  const cityFiltered = venues.filter((v) => matchesCity(v.city));
+  const cityFiltered = venues ? venues.filter((v) => matchesCity(v.city)) : [];
 
   // Task 10.3 — filter by sport using fetched listings
   const list =
@@ -167,27 +208,43 @@ export function TurfBrowsePage() {
             <p className="venue-empty__sub">We're onboarding venues — check back soon.</p>
           </div>
         ) : (
-          <div className="venue-grid">
-            {list.map((v) => (
-              <VenueCard
-                key={v.id}
-                venue={v}
-                selectedSport={selectedSport}
-                listings={venueListings[v.id] ?? []}
-                onSelect={() => {
-                  track({
-                    event: 'venue_card_click',
-                    venue_id: v.id,
-                    venue_name: v.name,
-                    sport: selectedSport !== 'all' ? selectedSport : '',
-                    city: v.city,
-                  });
-                  if (!user) navigate(`/login?next=${encodeURIComponent(`/venue/${v.id}${selectedSport !== 'all' ? `?sport=${selectedSport}` : ''}`)}`);
-                  else navigate(`/venue/${v.id}${selectedSport !== 'all' ? `?sport=${selectedSport}` : ''}`);
-                }}
-              />
-            ))}
-          </div>
+          <>
+            <div className="venue-grid">
+              {list.map((v) => (
+                <VenueCard
+                  key={v.id}
+                  venue={v}
+                  selectedSport={selectedSport}
+                  listings={venueListings[v.id] ?? []}
+                  onSelect={() => {
+                    track({
+                      event: 'venue_card_click',
+                      venue_id: v.id,
+                      venue_name: v.name,
+                      sport: selectedSport !== 'all' ? selectedSport : '',
+                      city: v.city,
+                    });
+                    if (!user) navigate(`/login?next=${encodeURIComponent(`/venue/${v.id}${selectedSport !== 'all' ? `?sport=${selectedSport}` : ''}`)}`);
+                    else navigate(`/venue/${v.id}${selectedSport !== 'all' ? `?sport=${selectedSport}` : ''}`);
+                  }}
+                />
+              ))}
+            </div>
+
+            {/* Pagination controls */}
+            {hasMore && (
+              <div style={{ display: 'flex', justifyContent: 'center', marginTop: 32 }}>
+                <button 
+                  type="button" 
+                  className="btn btn-secondary" 
+                  onClick={() => void loadMore()}
+                  disabled={loadingMore}
+                >
+                  {loadingMore ? 'Loading...' : `Load more (${list.length} of ${total})`}
+                </button>
+              </div>
+            )}
+          </>
         )}
 
         {!user ? (

@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+
+{% block title %}Your {{ purpose }} code - Champion Circuit{% endblock %}
+
+{% block preheader %}Your {{ purpose }} verification code: {{ otp }}{% endblock %}
+
+{% block content %}
+<table width="100%" cellpadding="0" cellspacing="0" border="0">
+    <!-- Heading -->
+    <tr>
+        <td style="padding-bottom: 8px;">
+            <h2 style="margin: 0; font-size: 15px; font-weight: 600; color: rgba(232, 244, 244, 0.7); line-height: 1.4;">
+                Your {{ purpose }} code
+            </h2>
+        </td>
+    </tr>
+
+    <!-- OTP Box -->
+    <tr>
+        <td style="padding: 24px 0;">
+            <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background: linear-gradient(135deg, rgba(10, 191, 188, 0.1) 0%, rgba(10, 191, 188, 0.05) 100%); border: 2px solid rgba(10, 191, 188, 0.3); border-radius: 12px;">
+                <tr>
+                    <td style="padding: 32px 24px; text-align: center;">
+                        <p style="margin: 0 0 12px; font-size: 12px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: rgba(10, 191, 188, 0.8);">
+                            VERIFICATION CODE
+                        </p>
+                        <p style="margin: 0; font-size: 48px; font-weight: 800; letter-spacing: 0.25em; color: #ffffff; font-family: 'Courier New', Courier, monospace; text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);">
+                            {{ otp }}
+                        </p>
+                    </td>
+                </tr>
+            </table>
+        </td>
+    </tr>
+
+    <!-- Instructions -->
+    <tr>
+        <td style="padding-bottom: 16px;">
+            <p style="margin: 0; font-size: 14px; color: rgba(232, 244, 244, 0.65); line-height: 1.7;">
+                Enter this code to complete your {{ purpose }} on Champion Circuit.
+            </p>
+        </td>
+    </tr>
+
+    <!-- Expiry Warning -->
+    <tr>
+        <td style="padding: 16px 20px; background: rgba(255, 165, 0, 0.08); border-left: 3px solid #ff9500; border-radius: 8px;">
+            <table width="100%" cellpadding="0" cellspacing="0" border="0">
+                <tr>
+                    <td width="24" valign="top" style="padding-right: 12px;">
+                        <span style="font-size: 18px;">⚠️</span>
+                    </td>
+                    <td>
+                        <p style="margin: 0; font-size: 13px; color: rgba(232, 244, 244, 0.75); line-height: 1.6;">
+                            <strong style="color: #ff9500;">This code expires in {{ expiry_minutes|default(10) }} minutes.</strong><br>
+                            For security, never share this code with anyone.
+                        </p>
+                    </td>
+                </tr>
+            </table>
+        </td>
+    </tr>
+
+    <!-- Security note -->
+    <tr>
+        <td style="padding-top: 24px;">
+            <p style="margin: 0; font-size: 12px; color: rgba(232, 244, 244, 0.4); line-height: 1.6;">
+                If you didn't request this code, you can safely ignore this email. Someone may have entered your email address by mistake.
+            </p>
+        </td>
+    </tr>
+</table>
+{% endblock %}

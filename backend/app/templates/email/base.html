@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <title>{% block title %}Champion Circuit{% endblock %}</title>
+    <!--[if mso]>
+    <style type="text/css">
+        body, table, td { font-family: Arial, Helvetica, sans-serif !important; }
+    </style>
+    <![endif]-->
+</head>
+<body style="margin: 0; padding: 0; background-color: #060d1a; font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Arial, sans-serif; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale;">
+    <!-- Preheader text (hidden but shows in inbox preview) -->
+    <div style="display: none; max-height: 0px; overflow: hidden; font-size: 1px; line-height: 1px; color: #060d1a;">
+        {% block preheader %}{% endblock %}
+    </div>
+
+    <!-- 100% width wrapper -->
+    <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color: #060d1a; min-height: 100vh;">
+        <tr>
+            <td align="center" style="padding: 40px 20px;">
+                
+                <!-- Main container -->
+                <table width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width: 600px; background-color: #0a1628; border: 1px solid rgba(10, 191, 188, 0.2); border-radius: 16px; overflow: hidden; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);">
+                    
+                    <!-- Header -->
+                    <tr>
+                        <td style="background-color: #0a1628; border-bottom: 1px solid rgba(10, 191, 188, 0.2); padding: 28px 32px 24px; text-align: center;">
+                            {% block header %}
+                            <table width="100%" cellpadding="0" cellspacing="0" border="0">
+                                <tr>
+                                    <td align="center">
+                                        <h1 style="margin: 0; font-size: 13px; font-weight: 700; letter-spacing: 0.18em; text-transform: uppercase; color: #0abfbc; font-family: 'Segoe UI', -apple-system, sans-serif;">
+                                            CHAMPION CIRCUIT
+                                        </h1>
+                                    </td>
+                                </tr>
+                            </table>
+                            {% endblock %}
+                        </td>
+                    </tr>
+
+                    <!-- Body -->
+                    <tr>
+                        <td style="background-color: #0a1628; padding: 36px 32px 28px;">
+                            {% block content %}
+                            <!-- Content goes here -->
+                            {% endblock %}
+                        </td>
+                    </tr>
+
+                    <!-- Footer -->
+                    <tr>
+                        <td style="background-color: #060d1a; border-top: 1px solid rgba(10, 191, 188, 0.2); padding: 24px 32px;">
+                            {% block footer %}
+                            <table width="100%" cellpadding="0" cellspacing="0" border="0">
+                                <tr>
+                                    <td style="padding-bottom: 16px;">
+                                        <table cellpadding="0" cellspacing="0" border="0" align="center">
+                                            <tr>
+                                                <td style="padding: 0 8px;">
+                                                    <a href="https://championcircuit.com" style="color: rgba(232, 244, 244, 0.6); text-decoration: none; font-size: 13px;">
+                                                        Website
+                                                    </a>
+                                                </td>
+                                                <td style="color: rgba(232, 244, 244, 0.3); padding: 0 8px;">•</td>
+                                                <td style="padding: 0 8px;">
+                                                    <a href="https://championcircuit.com/tournaments" style="color: rgba(232, 244, 244, 0.6); text-decoration: none; font-size: 13px;">
+                                                        Tournaments
+                                                    </a>
+                                                </td>
+                                                <td style="color: rgba(232, 244, 244, 0.3); padding: 0 8px;">•</td>
+                                                <td style="padding: 0 8px;">
+                                                    <a href="https://championcircuit.com/turf" style="color: rgba(232, 244, 244, 0.6); text-decoration: none; font-size: 13px;">
+                                                        Book Turf
+                                                    </a>
+                                                </td>
+                                            </tr>
+                                        </table>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td style="padding-bottom: 12px; text-align: center;">
+                                        <p style="margin: 0; font-size: 12px; color: rgba(232, 244, 244, 0.35); line-height: 1.6;">
+                                            Questions? Email us at 
+                                            <a href="mailto:official@championcircuit.com" style="color: rgba(10, 191, 188, 0.8); text-decoration: none;">
+                                                official@championcircuit.com
+                                            </a>
+                                        </p>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td style="text-align: center;">
+                                        <p style="margin: 0; font-size: 11px; color: rgba(232, 244, 244, 0.25); line-height: 1.6;">
+                                            &copy; 2026 Champion Circuit Private Limited<br>
+                                            India's Premier Sports & Gaming Platform
+                                        </p>
+                                    </td>
+                                </tr>
+                            </table>
+                            {% endblock %}
+                        </td>
+                    </tr>
+
+                </table>
+                <!-- End main container -->
+
+            </td>
+        </tr>
+    </table>
+    <!-- End 100% wrapper -->
+
+</body>
+</html>

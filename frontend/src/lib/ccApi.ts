@@ -266,6 +266,14 @@ export interface Notification {
   link: string; is_read: boolean; created_at: string;
 }
 
+export interface PaginatedResponse<T> {
+  items: T[];
+  total: number;
+  skip: number;
+  limit: number;
+  has_more: boolean;
+}
+
 export interface Review {
   id: number;
   venue_id: number;
@@ -285,8 +293,14 @@ export const ccApi = {
   categories: () => req<Category[]>('/api/categories'),
 
   // Venues
-  venues: (city = '') =>
-    req<Venue[]>(`/api/venues${city ? `?city=${encodeURIComponent(city)}` : ''}`),
+  venues: (city = '', skip = 0, limit = 12) =>
+    req<PaginatedResponse<Venue>>(
+      `/api/venues?${new URLSearchParams({ 
+        city, 
+        skip: String(skip), 
+        limit: String(limit) 
+      }).toString()}`
+    ),
   venue: (id: number) => req<Venue>(`/api/venues/${id}`),
   venueListings: (id: number) => req<VenueListing[]>(`/api/venues/${id}/listings`),
   listing: (id: number) => req<VenueListing>(`/api/listings/${id}`),
@@ -361,11 +375,11 @@ export const ccApi = {
   },
 
   // Tournaments
-  tournaments: (params: { status_filter?: string; game?: string; venue_id?: number } = {}) => {
+  tournaments: (params: { status_filter?: string; game?: string; venue_id?: number; skip?: number; limit?: number } = {}) => {
     const qs = new URLSearchParams(
-      Object.fromEntries(Object.entries(params).filter(([, v]) => v).map(([k, v]) => [k, String(v)]))
+      Object.fromEntries(Object.entries(params).filter(([, v]) => v !== undefined && v !== '').map(([k, v]) => [k, String(v)]))
     ).toString();
-    return req<Tournament[]>(`/api/tournaments${qs ? `?${qs}` : ''}`);
+    return req<PaginatedResponse<Tournament>>(`/api/tournaments${qs ? `?${qs}` : ''}`);
   },
   tournament: (id: number) => req<Tournament>(`/api/tournaments/${id}`),
   tournamentBySlug: (slug: string) =>

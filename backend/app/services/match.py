@@ -555,6 +555,15 @@ def _validate_registration_payload(
     contact_phone = (payload.contact_phone or user.phone or "").strip()[:20]
     if not contact_phone:
         raise ValueError("A contact phone number is required")
+    
+    # Validate phone is exactly 10 digits
+    phone_digits = ''.join(filter(str.isdigit, contact_phone))
+    if len(phone_digits) != 10:
+        raise ValueError("Phone number must be exactly 10 digits")
+    
+    # Update user's phone if it's different (sync registration phone to profile)
+    if user.phone != phone_digits:
+        user.phone = phone_digits
 
     team_id = None
     roster: list[dict] = []
@@ -584,6 +593,10 @@ def _validate_registration_payload(
                 raise ValueError("Duplicate player in the roster")
             if not entry.name.strip() or not entry.phone.strip():
                 raise ValueError("Every squad member needs a name and phone number")
+            # Validate roster phone numbers are exactly 10 digits
+            roster_phone_digits = ''.join(filter(str.isdigit, entry.phone))
+            if len(roster_phone_digits) != 10:
+                raise ValueError("Every squad member's phone number must be exactly 10 digits")
             seen.add(entry.user_id)
 
         # A player may only appear in one squad per tournament
@@ -600,14 +613,14 @@ def _validate_registration_payload(
 
         team_id = team.id
         roster = [
-            {"user_id": e.user_id, "name": e.name.strip()[:120], "phone": e.phone.strip()[:20]}
+            {"user_id": e.user_id, "name": e.name.strip()[:120], "phone": ''.join(filter(str.isdigit, e.phone))[:10]}
             for e in payload.roster
         ]
 
     return {
         "team_id": team_id,
         "contact_name": contact_name,
-        "contact_phone": contact_phone,
+        "contact_phone": phone_digits,
         "roster_json": json.dumps(roster),
     }
 

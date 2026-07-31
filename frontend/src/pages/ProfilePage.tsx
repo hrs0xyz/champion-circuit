@@ -28,6 +28,7 @@ export function ProfilePage() {
   // Edit form state — initialized lazily so they always reflect latest user
   const [name, setName] = useState(user?.name ?? '');
   const [phone, setPhone] = useState(user?.phone ?? '');
+  const [phoneError, setPhoneError] = useState('');
   const [city, setCity] = useState(user?.city ?? '');
   const [postalCode, setPostalCode] = useState(user?.postal_code ?? '');
   const [bio, setBio] = useState(user?.bio ?? '');
@@ -42,6 +43,7 @@ export function ProfilePage() {
   function startEdit() {
     setName(user!.name ?? '');
     setPhone(user!.phone ?? '');
+    setPhoneError('');
     setCity(user!.city ?? '');
     setPostalCode(user!.postal_code ?? '');
     setBio(user!.bio ?? '');
@@ -55,6 +57,24 @@ export function ProfilePage() {
   function cancelEdit() {
     setEditing(false);
     setError('');
+    setPhoneError('');
+  }
+
+  function validatePhone(phoneNum: string): boolean {
+    const cleaned = phoneNum.replace(/\D/g, '');
+    return cleaned.length === 10;
+  }
+
+  function handlePhoneChange(value: string) {
+    // Only allow digits
+    const cleaned = value.replace(/\D/g, '');
+    if (cleaned.length <= 10) {
+      setPhone(cleaned);
+      setPhoneError('');
+      if (cleaned.length > 0 && cleaned.length < 10) {
+        setPhoneError('Phone number must be exactly 10 digits');
+      }
+    }
   }
 
   function toggleInterest(interest: string) {
@@ -65,8 +85,13 @@ export function ProfilePage() {
 
   async function handleSave() {
     setError('');
+    setPhoneError('');
     if (!currentPassword) {
       setError('Enter your current password to save changes.');
+      return;
+    }
+    if (phone && !validatePhone(phone)) {
+      setPhoneError('Phone number must be exactly 10 digits');
       return;
     }
     setSaving(true);
@@ -236,10 +261,12 @@ export function ProfilePage() {
                 className="auth-input"
                 type="tel"
                 value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-                placeholder="+91 98765 43210"
-                maxLength={20}
+                onChange={(e) => handlePhoneChange(e.target.value)}
+                placeholder="10-digit mobile number"
+                inputMode="numeric"
+                pattern="[0-9]*"
               />
+              {phoneError && <p className="auth-error" style={{ marginTop: 4, fontSize: '0.875rem' }}>{phoneError}</p>}
             </div>
 
             <div className="auth-field">

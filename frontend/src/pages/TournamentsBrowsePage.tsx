@@ -36,6 +36,11 @@ export function TournamentsBrowsePage() {
   const [tournaments, setTournaments] = useState<Tournament[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [total, setTotal] = useState(0);
+  const [hasMore, setHasMore] = useState(false);
+  const [page, setPage] = useState(0);
+  const ITEMS_PER_PAGE = 12;
 
   useEffect(() => {
     ccApi.categories().then(setCategories).catch(() => setCategories([]));
@@ -43,20 +48,53 @@ export function TournamentsBrowsePage() {
 
   useEffect(() => {
     setLoading(true);
+    setPage(0);
     const status = TAB_STATUS[tab];
-    ccApi.tournaments(status ? { status_filter: status } : {})
-      .then(setTournaments)
-      .catch(() => setTournaments([]))
+    ccApi.tournaments(status ? { status_filter: status, skip: 0, limit: ITEMS_PER_PAGE } : { skip: 0, limit: ITEMS_PER_PAGE })
+      .then((response) => {
+        setTournaments(response.items);
+        setTotal(response.total);
+        setHasMore(response.has_more);
+      })
+      .catch(() => {
+        setTournaments([]);
+        setTotal(0);
+        setHasMore(false);
+      })
       .finally(() => setLoading(false));
   }, [tab]);
 
+  const loadMore = async () => {
+    if (loadingMore || !hasMore) return;
+    setLoadingMore(true);
+    const nextPage = page + 1;
+    const status = TAB_STATUS[tab];
+    try {
+      const response = await ccApi.tournaments(
+        status 
+          ? { status_filter: status, skip: nextPage * ITEMS_PER_PAGE, limit: ITEMS_PER_PAGE } 
+          : { skip: nextPage * ITEMS_PER_PAGE, limit: ITEMS_PER_PAGE }
+      );
+      setTournaments((prev) => [...prev, ...response.items]);
+      setHasMore(response.has_more);
+      setPage(nextPage);
+    } catch {
+      // Silent fail
+    } finally {
+      setLoadingMore(false);
+    }
+  };
+
   const typeBySlug = useMemo(() => {
     const map: Record<string, string> = {};
-    for (const c of categories) map[c.slug] = c.type;
+    if (categories) {
+      for (const c of categories) map[c.slug] = c.type;
+    }
     return map;
   }, [categories]);
 
   const visible = useMemo(() => {
+    if (!tournaments || tournaments.length === 0) return [];
     const filtered = tournaments.filter((t) => {
       // City: tournaments follow their primary venue's city; venue-less events always pass
       if (t.venue?.city && !matchesCity(t.venue.city)) return false;
@@ -125,57 +163,73 @@ export function TournamentsBrowsePage() {
             <p className="lb-empty__sub">New events drop regularly — check back soon.</p>
           </div>
         ) : (
-          <div className="tournament-grid">
-            {visible.map((t) => (
-              <Link key={t.id} to={`/tournaments/${t.slug}`} className="tournament-card-new trn-card-link">
-                {t.banner_url ? (
-                  <div className="tournament-card-new__banner">
-                    <img src={t.banner_url} alt={t.name} />
-                  </div>
-                ) : null}
-
-                <div className="tournament-card-new__body">
-                  <div className="tournament-card-new__header">
-                    <div className="tournament-card-new__status-row">
-                      <span
-                        className="tournament-card-new__dot"
-                        style={{ background: STATUS_DOT[t.status] ?? '#555' }}
-                      />
-                      <span className="tournament-card-new__status">{t.status.toUpperCase()}</span>
-                      {t.is_featured && <span className="tournament-card-new__exclusive">FEATURED</span>}
+          <>
+            <div className="tournament-grid">
+              {visible.map((t) => (
+                <Link key={t.id} to={`/tournaments/${t.slug}`} className="tournament-card-new trn-card-link">
+                  {t.banner_url ? (
+                    <div className="tournament-card-new__banner">
+                      <img src={t.banner_url} alt={t.name} />
                     </div>
-                    <span className="tournament-card-new__game">{t.game}</span>
-                  </div>
+                  ) : null}
 
-                  <h3 className="tournament-card-new__name">{t.name}</h3>
+                  <div className="tournament-card-new__body">
+                    <div className="tournament-card-new__header">
+                      <div className="tournament-card-new__status-row">
+                        <span
+                          className="tournament-card-new__dot"
+                          style={{ background: STATUS_DOT[t.status] ?? '#555' }}
+                        />
+                        <span className="tournament-card-new__status">{t.status.toUpperCase()}</span>
+                        {t.is_featured && <span className="tournament-card-new__exclusive">FEATURED</span>}
+                      </div>
+                      <span className="tournament-card-new__game">{t.game}</span>
+                    </div>
 
-                  <div className="tournament-card-new__meta">
-                    <span>🎮 {t.mode} · {t.format.replace(/_/g, ' ')}</span>
-                    <span>👥 {t.participant_count}/{t.max_participants}</span>
-                    {t.starts_at ? <span>📅 {t.starts_at.slice(0, 10)}</span> : null}
-                    {t.venue ? <span>📍 {t.venue.name}{t.venue.city ? `, ${t.venue.city}` : ''}</span> : null}
-                  </div>
+                    <h3 className="tournament-card-new__name">{t.name}</h3>
 
-                  {t.prize_pool_paise > 0 && (
-                    <p className="tournament-card-new__prize">
-                      🏆 Prize pool: ₹{t.prize_pool_paise / 100}
-                    </p>
-                  )}
+                    <div className="tournament-card-new__meta">
+                      <span>🎮 {t.mode} · {t.format.replace(/_/g, ' ')}</span>
+                      <span>👥 {t.participant_count}/{t.max_participants}</span>
+                      {t.starts_at ? <span>📅 {t.starts_at.slice(0, 10)}</span> : null}
+                      {t.venue ? <span>📍 {t.venue.name}{t.venue.city ? `, ${t.venue.city}` : ''}</span> : null}
+                    </div>
 
-                  <div className="tournament-card-new__footer">
-                    <span className={t.entry_fee_paise === 0 ? 'free-chip' : 'tournament-card-new__fee'}>
-                      {feeLabel(t)}
-                    </span>
-                    {t.registration_effectively_open ? (
-                      <span className="btn btn-primary btn-sm">Register →</span>
-                    ) : (
-                      <span className="muted small">View details →</span>
+                    {t.prize_pool_paise > 0 && (
+                      <p className="tournament-card-new__prize">
+                        🏆 Prize pool: ₹{t.prize_pool_paise / 100}
+                      </p>
                     )}
+
+                    <div className="tournament-card-new__footer">
+                      <span className={t.entry_fee_paise === 0 ? 'free-chip' : 'tournament-card-new__fee'}>
+                        {feeLabel(t)}
+                      </span>
+                      {t.registration_effectively_open ? (
+                        <span className="btn btn-primary btn-sm">Register →</span>
+                      ) : (
+                        <span className="muted small">View details →</span>
+                      )}
+                    </div>
                   </div>
-                </div>
-              </Link>
-            ))}
-          </div>
+                </Link>
+              ))}
+            </div>
+
+            {/* Pagination controls */}
+            {hasMore && (
+              <div style={{ display: 'flex', justifyContent: 'center', marginTop: 32 }}>
+                <button 
+                  type="button" 
+                  className="btn btn-secondary" 
+                  onClick={() => void loadMore()}
+                  disabled={loadingMore}
+                >
+                  {loadingMore ? 'Loading...' : `Load more (${visible.length} of ${total})`}
+                </button>
+              </div>
+            )}
+          </>
         )}
       </div>
     </section>

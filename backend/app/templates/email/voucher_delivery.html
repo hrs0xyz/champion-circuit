@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+
+{% block title %}Your Voucher{% if vouchers|length > 1 %}s{% endif %} - Champion Circuit{% endblock %}
+
+{% block preheader %}Your Champion Circuit voucher{% if vouchers|length > 1 %}s are{% else %} is{% endif %} ready!{% endblock %}
+
+{% block content %}
+<table width="100%" cellpadding="0" cellspacing="0" border="0">
+    <!-- Heading -->
+    <tr>
+        <td style="padding-bottom: 4px;">
+            <h1 style="margin: 0; font-size: 20px; font-weight: 700; color: #ffffff;">
+                Your voucher{% if vouchers|length > 1 %}s are{% else %} is{% endif %} ready 🎟
+            </h1>
+        </td>
+    </tr>
+
+    <!-- Greeting -->
+    <tr>
+        <td style="padding-bottom: 20px;">
+            <p style="margin: 0; font-size: 14px; color: rgba(232, 244, 244, 0.55);">
+                {% if buyer_name %}Hi {{ buyer_name }},{% else %}Hi there,{% endif %}
+            </p>
+        </td>
+    </tr>
+
+    <!-- Voucher List -->
+    {% for voucher in vouchers %}
+    <tr>
+        <td style="padding-bottom: {% if loop.last %}24{% else %}16{% endif %}px;">
+            <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background: rgba(10, 191, 188, 0.05); border: 1px solid rgba(10, 191, 188, 0.2); border-radius: 10px;">
+                <tr>
+                    <td style="padding: 18px 20px;">
+                        <table width="100%" cellpadding="0" cellspacing="0" border="0">
+                            <tr>
+                                <td style="padding-bottom: 4px;">
+                                    <p style="margin: 0; font-size: 13px; color: rgba(232, 244, 244, 0.5);">
+                                        {{ voucher.title }}
+                                    </p>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td style="padding-bottom: 8px;">
+                                    <p style="margin: 0; font-size: 26px; font-weight: 800; letter-spacing: 0.18em; color: #ffffff; font-family: 'Courier New', Courier, monospace;">
+                                        {{ voucher.code }}
+                                    </p>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td>
+                                    <p style="margin: 0; font-size: 13px; color: rgba(232, 244, 244, 0.6);">
+                                        {{ voucher.value_label }} · Redeemable at {{ partner_name }}
+                                    </p>
+                                </td>
+                            </tr>
+                        </table>
+                    </td>
+                </tr>
+            </table>
+        </td>
+    </tr>
+    {% endfor %}
+
+    <!-- Instructions -->
+    <tr>
+        <td style="padding: 16px 20px; background: rgba(10, 191, 188, 0.08); border-left: 3px solid #0abfbc; border-radius: 8px; margin-bottom: 20px;">
+            <table width="100%" cellpadding="0" cellspacing="0" border="0">
+                <tr>
+                    <td width="28" valign="top" style="padding-right: 12px;">
+                        <span style="font-size: 18px;">📱</span>
+                    </td>
+                    <td>
+                        <p style="margin: 0; font-size: 13px; color: rgba(232, 244, 244, 0.75); line-height: 1.6;">
+                            Show this code or QR at the venue to redeem. Questions? Contact us at 
+                            <a href="mailto:official@championcircuit.com" style="color: #0abfbc; text-decoration: none;">official@championcircuit.com</a>
+                        </p>
+                    </td>
+                </tr>
+            </table>
+        </td>
+    </tr>
+
+    <!-- Save reminder -->
+    <tr>
+        <td style="padding-top: 20px;">
+            <p style="margin: 0; font-size: 12px; color: rgba(232, 244, 244, 0.4); line-height: 1.6;">
+                💡 Save this email for easy access to your voucher code{% if vouchers|length > 1 %}s{% endif %}.
+            </p>
+        </td>
+    </tr>
+</table>
+{% endblock %}

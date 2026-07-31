@@ -224,15 +224,36 @@ def list_tournaments_route(
     game: str = "",
     venue_id: int = 0,
     skip: int = 0,
-    limit: int = 50,
+    limit: int = 12,
     db: Session = Depends(get_db),
 ):
-    """Public list — drafts and pending-approval tournaments are hidden."""
+    """Public list — drafts and pending-approval tournaments are hidden. Returns paginated results."""
+    # Get total count for pagination
+    from app.models.match import Tournament
+    from app.services.match import PUBLIC_TOURNAMENT_STATUSES
+    
+    count_query = db.query(Tournament).filter(Tournament.status.in_(PUBLIC_TOURNAMENT_STATUSES))
+    if status_filter:
+        count_query = count_query.filter(Tournament.status == status_filter)
+    if game:
+        count_query = count_query.filter(Tournament.game == game)
+    if venue_id:
+        count_query = count_query.filter(Tournament.venue_id == venue_id)
+    
+    total = count_query.count()
+    
     tournaments = list_tournaments(
         db, status=status_filter, game=game, venue_id=venue_id,
-        skip=skip, limit=limit, public_only=True,
+        skip=skip, limit=min(limit, 50), public_only=True,
     )
-    return [serialize_tournament(t, db) for t in tournaments]
+    
+    return {
+        "items": [serialize_tournament(t, db) for t in tournaments],
+        "total": total,
+        "skip": skip,
+        "limit": limit,
+        "has_more": (skip + len(tournaments)) < total,
+    }
 
 
 @router.post("/tournaments", status_code=status.HTTP_201_CREATED)

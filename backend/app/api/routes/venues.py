@@ -91,9 +91,26 @@ def categories(db: Session = Depends(get_db)):
 # ── Venues (public) ───────────────────────────────────────────────────────────
 
 @router.get("/venues")
-def browse_venues(city: str = "", skip: int = 0, limit: int = 40, db: Session = Depends(get_db)):
-    venues = list_venues(db, city=city, skip=skip, limit=min(limit, 100))
-    return [serialize_venue(v) for v in venues]
+def browse_venues(city: str = "", skip: int = 0, limit: int = 12, db: Session = Depends(get_db)):
+    """List venues with pagination. Returns items, total count, and pagination metadata."""
+    from app.models.venue import Venue
+    
+    # Get total count for pagination
+    count_query = db.query(Venue).filter(Venue.is_active == True)
+    if city:
+        count_query = count_query.filter(Venue.city.ilike(f"%{city}%"))
+    
+    total = count_query.count()
+    
+    venues = list_venues(db, city=city, skip=skip, limit=min(limit, 50))
+    
+    return {
+        "items": [serialize_venue(v) for v in venues],
+        "total": total,
+        "skip": skip,
+        "limit": limit,
+        "has_more": (skip + len(venues)) < total,
+    }
 
 
 @router.get("/venues/{venue_id}")
