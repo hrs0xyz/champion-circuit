@@ -762,6 +762,11 @@ function TournamentManagement({ tournament, onUpdate, onMsg }: {
   const [busy, setBusy] = useState(false);
   const [assigning, setAssigning] = useState(false);
   const [assignUsername, setAssignUsername] = useState('');
+  const [editing, setEditing] = useState(false);
+  const [editForm, setEditForm] = useState({
+    min_participants: tournament.min_participants,
+    max_participants: tournament.max_participants,
+  });
 
   async function toggleRegistration() {
     try {
@@ -817,6 +822,20 @@ function TournamentManagement({ tournament, onUpdate, onMsg }: {
     }
   }
 
+  async function saveSettings() {
+    try {
+      await ccApi.updateTournament(tournament.id, {
+        min_participants: editForm.min_participants,
+        max_participants: editForm.max_participants,
+      });
+      onMsg('Tournament settings updated.', 'success');
+      setEditing(false);
+      onUpdate();
+    } catch (e) {
+      onMsg(e instanceof ApiError ? e.message : 'Failed to update tournament', 'error');
+    }
+  }
+
   return (
     <div className="staff-section">
       <h3 className="staff-h3">Tournament Management</h3>
@@ -860,6 +879,13 @@ function TournamentManagement({ tournament, onUpdate, onMsg }: {
           <button
             type="button"
             className="btn btn-secondary btn-sm"
+            onClick={() => setEditing(!editing)}
+          >
+            {editing ? 'Cancel edit' : '✏️ Edit settings'}
+          </button>
+          <button
+            type="button"
+            className="btn btn-secondary btn-sm"
             onClick={() => setAssigning(!assigning)}
           >
             {assigning ? 'Cancel' : 'Assign match admin'}
@@ -874,6 +900,45 @@ function TournamentManagement({ tournament, onUpdate, onMsg }: {
             </button>
           )}
         </div>
+
+        {editing && (
+          <div className="staff-card" style={{ marginTop: 16, background: '#0a0f1a' }}>
+            <h4 className="staff-h3" style={{ marginBottom: 16 }}>Edit Tournament Settings</h4>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+              <div className="auth-field">
+                <label className="auth-label">Minimum Participants</label>
+                <input
+                  type="number"
+                  className="auth-input"
+                  value={editForm.min_participants}
+                  onChange={(e) => setEditForm({ ...editForm, min_participants: Number(e.target.value) })}
+                  min={0}
+                />
+                <p className="muted small" style={{ marginTop: 4 }}>
+                  Set to 0 to disable minimum requirement
+                </p>
+              </div>
+              <div className="auth-field">
+                <label className="auth-label">Maximum Participants</label>
+                <input
+                  type="number"
+                  className="auth-input"
+                  value={editForm.max_participants}
+                  onChange={(e) => setEditForm({ ...editForm, max_participants: Number(e.target.value) })}
+                  min={2}
+                />
+              </div>
+            </div>
+            <div style={{ display: 'flex', gap: 12, marginTop: 16 }}>
+              <button type="button" className="btn btn-primary btn-sm" onClick={() => void saveSettings()}>
+                Save changes
+              </button>
+              <button type="button" className="btn btn-ghost btn-sm" onClick={() => setEditing(false)}>
+                Cancel
+              </button>
+            </div>
+          </div>
+        )}
 
         {assigning && (
           <div className="staff-inline-form" style={{ marginTop: 16 }}>
@@ -903,7 +968,12 @@ function TournamentManagement({ tournament, onUpdate, onMsg }: {
           </div>
           <div>
             <p className="muted small" style={{ marginBottom: 4 }}>Participants</p>
-            <p style={{ margin: 0 }}>{tournament.participant_count} / {tournament.max_participants}</p>
+            <p style={{ margin: 0 }}>
+              {tournament.participant_count} / {tournament.max_participants}
+              {tournament.min_participants > 0 && (
+                <span className="muted small"> (min: {tournament.min_participants})</span>
+              )}
+            </p>
           </div>
           <div>
             <p className="muted small" style={{ marginBottom: 4 }}>Entry Fee</p>
