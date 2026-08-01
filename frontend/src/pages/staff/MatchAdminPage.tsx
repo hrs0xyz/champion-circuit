@@ -351,6 +351,7 @@ function ParticipantsList({ tournamentId, participants, onChanged, onMsg }: {
 
   useEffect(() => {
     let html5QrCode: any = null;
+    let isStopped = false;
 
     if (showScanner && !scanning) {
       setScanning(true);
@@ -367,7 +368,8 @@ function ParticipantsList({ tournamentId, participants, onChanged, onMsg }: {
             },
             async (decodedText: string) => {
               // QR code scanned successfully - stop scanner first
-              if (html5QrCode) {
+              if (html5QrCode && !isStopped) {
+                isStopped = true;
                 await html5QrCode.stop().catch(() => {});
               }
               setShowScanner(false);
@@ -397,8 +399,12 @@ function ParticipantsList({ tournamentId, participants, onChanged, onMsg }: {
     }
 
     return () => {
-      if (html5QrCode) {
-        html5QrCode.stop().catch(() => {});
+      if (html5QrCode && !isStopped) {
+        isStopped = true;
+        // Only try to stop if we haven't already stopped it
+        html5QrCode.stop().catch(() => {
+          // Silently ignore errors when stopping (scanner may already be stopped)
+        });
         setScanning(false);
       }
     };

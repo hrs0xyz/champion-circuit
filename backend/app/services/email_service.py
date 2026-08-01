@@ -238,6 +238,7 @@ class SESEmailService:
             
             rendered = template.render(**context)
             print(f"[_render_template] Rendered successfully! Length: {len(rendered)}")
+            print(f"[_render_template] RETURNING rendered HTML")
             return rendered
             
         except TemplateNotFound as e:
