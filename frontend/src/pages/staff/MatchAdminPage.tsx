@@ -228,8 +228,12 @@ export function MatchAdminPage() {
                 onUpdate={() => {
                   ccApi.assignedTournaments().then(setTournaments).catch(() => {});
                   setMsg('Tournament updated.');
+                  setMsgType('success');
                 }}
-                onMsg={setMsg}
+                onMsg={(msg, type) => { 
+                  setMsg(msg); 
+                  if (type) setMsgType(type); 
+                }}
               />
             )}
           </>
@@ -753,7 +757,7 @@ function RecordMatch({ tournamentId, participants, onDone, onMsg }: {
 function TournamentManagement({ tournament, onUpdate, onMsg }: {
   tournament: Tournament;
   onUpdate: () => void;
-  onMsg: (m: string) => void;
+  onMsg: (m: string, type?: 'success' | 'error') => void;
 }) {
   const [busy, setBusy] = useState(false);
   const [assigning, setAssigning] = useState(false);
@@ -762,10 +766,10 @@ function TournamentManagement({ tournament, onUpdate, onMsg }: {
   async function toggleRegistration() {
     try {
       await ccApi.updateTournament(tournament.id, { registration_open: !tournament.registration_open });
-      onMsg(tournament.registration_open ? 'Registration closed.' : 'Registration opened.');
+      onMsg(tournament.registration_open ? 'Registration closed.' : 'Registration opened.', 'success');
       onUpdate();
     } catch (e) {
-      onMsg(e instanceof ApiError ? e.message : 'Failed to update registration');
+      onMsg(e instanceof ApiError ? e.message : 'Failed to update registration', 'error');
     }
   }
 
@@ -777,10 +781,12 @@ function TournamentManagement({ tournament, onUpdate, onMsg }: {
     setBusy(true);
     try {
       await ccApi.generateBracket(tournament.id);
-      onMsg(`Bracket generated — "${tournament.name}" is live.`);
+      onMsg(`Bracket generated — "${tournament.name}" is live.`, 'success');
       onUpdate();
     } catch (e) {
-      onMsg(e instanceof ApiError ? e.message : 'Failed to generate bracket');
+      const errorMsg = e instanceof ApiError ? e.message : 'Failed to generate bracket';
+      console.error('Generate bracket error:', e);
+      onMsg(errorMsg, 'error');
     } finally {
       setBusy(false);
     }
@@ -791,10 +797,10 @@ function TournamentManagement({ tournament, onUpdate, onMsg }: {
     if (reason === null) return;
     try {
       await ccApi.cancelTournament(tournament.id, reason);
-      onMsg(`"${tournament.name}" cancelled.`);
+      onMsg(`"${tournament.name}" cancelled.`, 'success');
       onUpdate();
     } catch (e) {
-      onMsg(e instanceof ApiError ? e.message : 'Failed to cancel tournament');
+      onMsg(e instanceof ApiError ? e.message : 'Failed to cancel tournament', 'error');
     }
   }
 
@@ -802,11 +808,11 @@ function TournamentManagement({ tournament, onUpdate, onMsg }: {
     if (!assignUsername.trim()) return;
     try {
       await ccApi.assignMatchAdmin(tournament.id, assignUsername.trim());
-      onMsg(`Assigned @${assignUsername} as match admin`);
+      onMsg(`Assigned @${assignUsername} as match admin`, 'success');
       setAssigning(false);
       setAssignUsername('');
     } catch (e) {
-      onMsg(e instanceof ApiError ? e.message : 'Failed to assign match admin');
+      onMsg(e instanceof ApiError ? e.message : 'Failed to assign match admin', 'error');
     }
   }
 
