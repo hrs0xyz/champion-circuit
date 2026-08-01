@@ -383,16 +383,34 @@ def update_tournament(
             detail="Paid entry is not supported yet — keep the entry fee at 0 (free)",
         )
     if not current_user.is_admin:
+        # Check if user is a match admin for this tournament
+        from app.api.deps import is_tournament_admin
+        is_match_admin = is_tournament_admin(db, current_user, tournament_id)
+        
         # Venue owners: drafts only. Once submitted for approval the content
         # is frozen — otherwise it could be swapped between review and approve.
-        if t.status != "draft":
+        # Match admins: can edit min/max participants even in registration status
+        if t.status != "draft" and not is_match_admin:
             raise HTTPException(
                 status_code=403,
                 detail="Only draft tournaments can be edited — "
                        "ask the platform admin to send it back to draft first",
             )
+        
+        # Match admins can only edit participant limits, not other fields
+        if is_match_admin and t.status != "draft":
+            allowed_fields = {"min_participants", "max_participants"}
+            disallowed = set(data.keys()) - allowed_fields
+            if disallowed:
+                raise HTTPException(
+                    status_code=403,
+                    detail=f"Match admins can only edit min/max participants. Cannot edit: {', '.join(disallowed)}",
+                )
+        
+        # Lock certain fields for non-admins
         for locked in ("status", "is_featured", "venue_id", "listing_id", "registration_open"):
-            data.pop(locked, None)
+            if locked in data and not is_match_admin:
+                data.pop(locked, None)
     if "venue_id" in data:
         data["venue_id"] = data["venue_id"] or None
     if "listing_id" in data:
