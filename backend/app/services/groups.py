@@ -451,8 +451,7 @@ def complete_group_stage(
     
     # Generate knockout bracket with advancing players
     if len(advancing_user_ids) >= 2:
-        from app.services.match import _generate_knockout_bracket
-        _generate_knockout_bracket(
+        _generate_knockout_bracket_from_group_winners(
             db, tournament, admin_user_id, advancing_user_ids
         )
     
@@ -461,3 +460,124 @@ def complete_group_stage(
     db.commit()
     
     return tournament
+
+
+def _generate_knockout_bracket_from_group_winners(
+    db: Session,
+    tournament: Tournament,
+    admin_user_id: int,
+    advancing_user_ids: list[int],
+) -> None:
+    """
+    Generate knockout bracket matches for group stage winners.
+    Similar to generate_bracket() but uses specific participant list.
+    """
+    import random
+    from app.models.match import Match, MatchParticipant, TournamentStage
+    
+    participant_count = len(advancing_user_ids)
+    if participant_count < 2:
+        return
+    
+    # Determine bracket size (next power of 2)
+    bracket_size = 1 << (participant_count - 1).bit_length()
+    total_rounds = bracket_size.bit_length() - 1
+    
+    # Get stages for venue assignment
+    stages = list(tournament.stages)
+    
+    def stage_for_round(r: int) -> TournamentStage | None:
+        if not stages:
+            return None
+        # Proportional: early rounds → early stages, final → last stage
+        idx = min((r - 1) * len(stages) // total_rounds, len(stages) - 1)
+        return stages[idx]
+    
+    # Slot order for seeding (classic single-elimination order)
+    def _slot_order(size: int) -> list[int]:
+        if size == 1:
+            return [1]
+        half = _slot_order(size // 2)
+        return [h for h in half] + [size + 1 - h for h in half]
+    
+    order = _slot_order(bracket_size)
+    
+    # Create matches from final to round 1 (so next_match_id exists)
+    matches_by_round: dict[int, list[Match]] = {}
+    
+    for r in range(total_rounds, 0, -1):
+        stage = stage_for_round(r)
+        next_round = matches_by_round.get(r + 1)
+        row: list[Match] = []
+        
+        for i in range(bracket_size >> r):
+            next_match = next_round[i // 2] if next_round else None
+            m = Match(
+                tournament_id=tournament.id,
+                venue_id=(stage.venue_id if stage and stage.venue_id else tournament.venue_id) or None,
+                match_type="tournament",
+                game_mode="team_vs_team" if tournament.mode == "team" else tournament.mode,
+                status="scheduled",
+                match_phase="knockout",
+                round_number=r,
+                bracket_position=i,
+                stage_id=stage.id if stage else None,
+                next_match_id=next_match.id if next_match else None,
+                next_match_slot=("A" if i % 2 == 0 else "B") if next_match else "",
+                scheduled_at=(stage.starts_at if stage else "") or tournament.starts_at or "",
+                created_by_user_id=admin_user_id,
+            )
+            db.add(m)
+            row.append(m)
+        
+        db.flush()
+        matches_by_round[r] = row
+    
+    # Fill round 1 with group winners
+    round1 = matches_by_round[1]
+    
+    for k in range(bracket_size):
+        slot_seed = order[k]
+        if slot_seed > participant_count:
+            continue  # Bye slot
+        
+        user_id = advancing_user_ids[slot_seed - 1]
+        m = round1[k // 2]
+        side = "A" if k % 2 == 0 else "B"
+        
+        db.add(MatchParticipant(
+            match_id=m.id,
+            user_id=user_id,
+            team=side,
+            role="player",
+        ))
+    
+    db.flush()
+    
+    # Handle byes (matches with only one participant)
+    for m in round1:
+        parts = db.query(MatchParticipant).filter(
+            MatchParticipant.match_id == m.id
+        ).all()
+        
+        sides_present = {p.team for p in parts}
+        
+        if len(sides_present) == 2:
+            continue  # Both sides present, no bye
+        
+        if not sides_present:
+            continue  # Empty match (shouldn't happen)
+        
+        # Bye match: auto-complete and advance
+        m.is_bye = True
+        m.status = "completed"
+        
+        for p in parts:
+            db.add(MatchParticipant(
+                match_id=m.next_match_id,
+                user_id=p.user_id,
+                team=m.next_match_slot,
+                role=p.role,
+            ))
+    
+    db.flush()

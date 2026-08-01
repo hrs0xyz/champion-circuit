@@ -234,6 +234,14 @@ def verify_match(db: Session, match_id: int, admin_user_id: int) -> Match:
         elif tournament:
             placements = _finalize_tournament(db, tournament, match, winner_side, admin_user_id)
 
+    # ── Group Stage Integration ──
+    # Update group standings if this is a group match
+    if match.match_phase == "group_stage" and match.group_id and tournament:
+        import json
+        group_config = json.loads(tournament.group_config or "{}")
+        from app.services.groups import update_group_standings
+        update_group_standings(db, match, group_config)
+
     db.commit()
     db.refresh(match)
 
