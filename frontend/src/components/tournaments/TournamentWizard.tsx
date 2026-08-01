@@ -110,7 +110,7 @@ export function TournamentWizard({ venues, isAdmin, create, onDone, onClose }: T
       const formData = new FormData();
       formData.append('file', file);
       
-      const response = await fetch(`${BASE_URL}/api/uploads/news-image`, {
+      const response = await fetch(`${BASE_URL}/api/uploads/tournament-banner`, {
         method: 'POST',
         headers: token ? { Authorization: `Bearer ${token}` } : {},
         body: formData,

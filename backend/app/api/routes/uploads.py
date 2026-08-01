@@ -45,6 +45,26 @@ async def upload_avatar(
     return {"url": url}
 
 
+@router.post("/tournament-banner")
+async def upload_tournament_banner(
+    file: UploadFile = File(...),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> dict[str, str]:
+    """Upload a banner image for a tournament. Venue owners and admins only."""
+    if not current_user.is_venue_owner and not current_user.is_admin:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Venue owner or admin access required")
+    if file.content_type not in ALLOWED_TYPES:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Upload a JPG, PNG, or WEBP image")
+
+    data = await file.read()
+    if len(data) > MAX_BYTES:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Image must be 3MB or smaller")
+
+    url = upload_image(data, folder="champion-circuit/tournament-banners")
+    return {"url": url}
+
+
 @router.post("/news-image")
 async def upload_news_image(
     file: UploadFile = File(...),
