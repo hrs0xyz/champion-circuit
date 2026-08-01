@@ -47,7 +47,7 @@ export function MatchAdminPage() {
   const [selected, setSelected] = useState<Tournament | null>(null);
   const [participants, setParticipants] = useState<StaffParticipant[]>([]);
   const [matches, setMatches] = useState<Match[]>([]);
-  const [tab, setTab] = useState<'participants' | 'matches' | 'record' | 'tournaments'>('participants');
+  const [tab, setTab] = useState<'participants' | 'matches' | 'record' | 'tournaments' | 'groups'>('participants');
   const [msg, setMsg] = useState('');
   const [msgType, setMsgType] = useState<'success' | 'error'>('success');
   const [loading, setLoading] = useState(true);
@@ -173,7 +173,7 @@ export function MatchAdminPage() {
             </div>
 
             <div className="tab-row" style={{ marginBottom: 20 }}>
-              {(['participants', 'matches', 'record', 'tournaments'] as const).map((t) => (
+              {(['participants', 'matches', 'record', 'groups', 'tournaments'] as const).map((t) => (
                 <button key={t} type="button"
                   className={`tab-btn${tab === t ? ' is-active' : ''}`}
                   onClick={() => setTab(t)}>
@@ -230,6 +230,16 @@ export function MatchAdminPage() {
                   setMsg('Tournament updated.');
                   setMsgType('success');
                 }}
+                onMsg={(msg, type) => { 
+                  setMsg(msg); 
+                  if (type) setMsgType(type); 
+                }}
+              />
+            )}
+            {tab === 'groups' && selected && (
+              <GroupsManagement
+                tournament={selected}
+                onUpdate={() => void refreshData(selected)}
                 onMsg={(msg, type) => { 
                   setMsg(msg); 
                   if (type) setMsgType(type); 
@@ -993,6 +1003,319 @@ function TournamentManagement({ tournament, onUpdate, onMsg }: {
           </div>
         </div>
       </div>
+    </div>
+  );
+}
+
+
+// ── Groups Management ─────────────────────────────────────────────────────────
+type GroupStanding = {
+  user_id: number;
+  username: string;
+  name: string;
+  points: number;
+  wins: number;
+  draws: number;
+  losses: number;
+  goals_for: number;
+  goals_against: number;
+  goal_difference: number;
+  matches_played: number;
+  position: number;
+  advanced_to_knockout: boolean;
+};
+
+type GroupData = {
+  group_name: string;
+  group_id: number;
+  standings: GroupStanding[];
+};
+
+function GroupsManagement({ tournament, onUpdate, onMsg }: {
+  tournament: Tournament;
+  onUpdate: () => void;
+  onMsg: (m: string, type?: 'success' | 'error') => void;
+}) {
+  const [groups, setGroups] = useState<GroupData[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [generating, setGenerating] = useState(false);
+  const [completing, setCompleting] = useState(false);
+  const [showGenerateForm, setShowGenerateForm] = useState(false);
+  const [generateForm, setGenerateForm] = useState({
+    num_groups: 2,
+    advance_per_group: 2,
+    points_win: 3,
+    points_draw: 1,
+    points_loss: 0,
+  });
+
+  useEffect(() => {
+    loadGroups();
+  }, [tournament.id]);
+
+  async function loadGroups() {
+    try {
+      const data = await staffReq<GroupData[]>(`/api/admin/tournaments/${tournament.id}/groups`);
+      setGroups(data);
+    } catch (e) {
+      // Groups might not exist yet
+      setGroups([]);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function generateGroups() {
+    if (!window.confirm(
+      `Generate ${generateForm.num_groups} groups with round-robin matches?\n\n` +
+      `Top ${generateForm.advance_per_group} from each group will advance to knockout.`
+    )) return;
+
+    setGenerating(true);
+    try {
+      const res = await staffReq<{ message: string; groups: Array<{ id: number; name: string }>; total_matches: number }>(
+        `/api/admin/tournaments/${tournament.id}/generate-groups`,
+        {
+          method: 'POST',
+          body: JSON.stringify(generateForm),
+        }
+      );
+      onMsg(`${res.message} — ${res.total_matches} matches created`, 'success');
+      setShowGenerateForm(false);
+      await loadGroups();
+      onUpdate();
+    } catch (e) {
+      onMsg(e instanceof ApiError ? e.message : 'Failed to generate groups', 'error');
+    } finally {
+      setGenerating(false);
+    }
+  }
+
+  async function completeGroupStage() {
+    if (!window.confirm(
+      `Complete the group stage and generate knockout bracket?\n\n` +
+      `This will:\n` +
+      `- Verify all group matches are completed\n` +
+      `- Finalize group standings\n` +
+      `- Advance top ${generateForm.advance_per_group} from each group\n` +
+      `- Generate knockout bracket\n\n` +
+      `This action cannot be undone.`
+    )) return;
+
+    setCompleting(true);
+    try {
+      const res = await staffReq<{ message: string; phase: string }>(
+        `/api/admin/tournaments/${tournament.id}/complete-group-stage`,
+        { method: 'POST' }
+      );
+      onMsg(res.message, 'success');
+      await loadGroups();
+      onUpdate();
+    } catch (e) {
+      onMsg(e instanceof ApiError ? e.message : 'Failed to complete group stage', 'error');
+    } finally {
+      setCompleting(false);
+    }
+  }
+
+  // Check if tournament supports groups
+  const supportsGroups = tournament.format === 'groups_knockout' || tournament.format === 'round_robin';
+
+  if (!supportsGroups) {
+    return (
+      <div className="staff-section">
+        <h3 className="staff-h3">Groups</h3>
+        <div className="staff-card" style={{ textAlign: 'center', padding: 40 }}>
+          <p className="muted">This tournament format does not use groups.</p>
+          <p className="muted small" style={{ marginTop: 8 }}>
+            Tournament format: <strong>{tournament.format}</strong>
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  if (loading) {
+    return (
+      <div className="staff-section">
+        <h3 className="staff-h3">Groups</h3>
+        <p className="muted">Loading...</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="staff-section">
+      <div className="staff-section__header">
+        <h3 className="staff-h3">Groups</h3>
+        {groups.length === 0 && tournament.status === 'registration' && (
+          <button
+            type="button"
+            className="btn btn-primary btn-sm"
+            onClick={() => setShowGenerateForm(!showGenerateForm)}
+          >
+            {showGenerateForm ? 'Cancel' : '➕ Generate Groups'}
+          </button>
+        )}
+        {groups.length > 0 && tournament.status === 'live' && (
+          <button
+            type="button"
+            className="btn btn-primary btn-sm"
+            disabled={completing}
+            onClick={() => void completeGroupStage()}
+          >
+            {completing ? 'Completing...' : '✅ Complete Group Stage'}
+          </button>
+        )}
+      </div>
+
+      {showGenerateForm && (
+        <div className="staff-card" style={{ marginBottom: 20, background: '#0a0f1a' }}>
+          <h4 className="staff-h3" style={{ marginBottom: 16 }}>Group Configuration</h4>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 16 }}>
+            <div className="auth-field">
+              <label className="auth-label">Number of Groups</label>
+              <input
+                type="number"
+                className="auth-input"
+                value={generateForm.num_groups}
+                onChange={(e) => setGenerateForm({ ...generateForm, num_groups: Number(e.target.value) })}
+                min={1}
+                max={8}
+              />
+              <p className="muted small" style={{ marginTop: 4 }}>
+                Participants: {tournament.participant_count} → {Math.floor(tournament.participant_count / generateForm.num_groups)} per group
+              </p>
+            </div>
+            <div className="auth-field">
+              <label className="auth-label">Advance Per Group</label>
+              <input
+                type="number"
+                className="auth-input"
+                value={generateForm.advance_per_group}
+                onChange={(e) => setGenerateForm({ ...generateForm, advance_per_group: Number(e.target.value) })}
+                min={1}
+                max={8}
+              />
+              <p className="muted small" style={{ marginTop: 4 }}>
+                Total advancing: {generateForm.num_groups * generateForm.advance_per_group}
+              </p>
+            </div>
+            <div className="auth-field">
+              <label className="auth-label">Points for Win</label>
+              <input
+                type="number"
+                className="auth-input"
+                value={generateForm.points_win}
+                onChange={(e) => setGenerateForm({ ...generateForm, points_win: Number(e.target.value) })}
+                min={0}
+              />
+            </div>
+            <div className="auth-field">
+              <label className="auth-label">Points for Draw</label>
+              <input
+                type="number"
+                className="auth-input"
+                value={generateForm.points_draw}
+                onChange={(e) => setGenerateForm({ ...generateForm, points_draw: Number(e.target.value) })}
+                min={0}
+              />
+            </div>
+            <div className="auth-field">
+              <label className="auth-label">Points for Loss</label>
+              <input
+                type="number"
+                className="auth-input"
+                value={generateForm.points_loss}
+                onChange={(e) => setGenerateForm({ ...generateForm, points_loss: Number(e.target.value) })}
+                min={0}
+              />
+            </div>
+          </div>
+          <div style={{ display: 'flex', gap: 12, marginTop: 16 }}>
+            <button
+              type="button"
+              className="btn btn-primary btn-sm"
+              disabled={generating}
+              onClick={() => void generateGroups()}
+            >
+              {generating ? 'Generating...' : '⚔ Generate Groups'}
+            </button>
+            <button
+              type="button"
+              className="btn btn-ghost btn-sm"
+              onClick={() => setShowGenerateForm(false)}
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+
+      {groups.length === 0 ? (
+        <div className="staff-card" style={{ textAlign: 'center', padding: 40 }}>
+          <p className="muted">No groups generated yet.</p>
+          <p className="muted small" style={{ marginTop: 8 }}>
+            Generate groups to create round-robin matches within each group.
+          </p>
+        </div>
+      ) : (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))', gap: 20 }}>
+          {groups.map((group) => (
+            <div key={group.group_id} className="staff-card">
+              <h4 className="staff-h3" style={{ marginBottom: 16 }}>
+                Group {group.group_name}
+              </h4>
+              <div className="staff-table-wrap">
+                <table className="staff-table" style={{ fontSize: 13 }}>
+                  <thead>
+                    <tr>
+                      <th style={{ width: 40 }}>Pos</th>
+                      <th>Player</th>
+                      <th style={{ width: 50, textAlign: 'center' }}>Pts</th>
+                      <th style={{ width: 40, textAlign: 'center' }}>W</th>
+                      <th style={{ width: 40, textAlign: 'center' }}>D</th>
+                      <th style={{ width: 40, textAlign: 'center' }}>L</th>
+                      <th style={{ width: 50, textAlign: 'center' }}>GD</th>
+                      <th style={{ width: 50, textAlign: 'center' }}>MP</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {group.standings.map((standing) => (
+                      <tr
+                        key={standing.user_id}
+                        style={{
+                          background: standing.advanced_to_knockout ? '#0abfbc11' : 'transparent',
+                          fontWeight: standing.advanced_to_knockout ? 600 : 400,
+                        }}
+                      >
+                        <td>{standing.position}</td>
+                        <td>
+                          @{standing.username}
+                          {standing.advanced_to_knockout && (
+                            <span style={{ marginLeft: 6, color: '#0abfbc', fontSize: 11 }}>✓ ADV</span>
+                          )}
+                        </td>
+                        <td style={{ textAlign: 'center', fontWeight: 600 }}>{standing.points}</td>
+                        <td style={{ textAlign: 'center', color: '#4ade80' }}>{standing.wins}</td>
+                        <td style={{ textAlign: 'center', color: '#fbbf24' }}>{standing.draws}</td>
+                        <td style={{ textAlign: 'center', color: '#f87171' }}>{standing.losses}</td>
+                        <td style={{ textAlign: 'center' }}>
+                          {standing.goal_difference > 0 ? '+' : ''}{standing.goal_difference}
+                        </td>
+                        <td style={{ textAlign: 'center' }}>{standing.matches_played}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <p className="muted small" style={{ marginTop: 12, textAlign: 'center' }}>
+                Pts = Points, W = Wins, D = Draws, L = Losses, GD = Goal Difference, MP = Matches Played
+              </p>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

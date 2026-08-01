@@ -55,6 +55,7 @@ export function TournamentWizard({ venues, isAdmin, create, onDone, onClose }: T
     name: '',
     game: '',
     mode: 'solo',
+    format_type: 'knockout',
     venue_id: 0,
     max_participants: 16,
     min_participants: 0,
@@ -217,7 +218,8 @@ export function TournamentWizard({ venues, isAdmin, create, onDone, onClose }: T
       name: form.name.trim(),
       game: form.game,
       mode: form.mode,
-      format: 'knockout',
+      format: form.format_type,
+      format_type: form.format_type,
       venue_id: form.venue_id,
       max_participants: form.max_participants,
       min_participants: form.min_participants,
@@ -347,7 +349,17 @@ export function TournamentWizard({ venues, isAdmin, create, onDone, onClose }: T
 
           <div className="auth-field">
             <label className="auth-label">Format</label>
-            <input className="auth-input" value="knockout" disabled title="More formats coming soon" />
+            <select className="auth-input" value={form.format_type} onChange={(e) => set({ format_type: e.target.value })}>
+              <option value="knockout">Knockout (Single Elimination)</option>
+              <option value="groups_knockout">Groups + Knockout</option>
+              <option value="round_robin">Round Robin (Everyone plays everyone)</option>
+            </select>
+            <p className="help-text" style={{ marginTop: 4, fontSize: '0.875rem', color: '#888' }}>
+              {form.format_type === 'knockout' && 'Classic bracket - players eliminated after one loss'}
+              {form.format_type === 'groups_knockout' && 'Group stage with top N advancing to knockout bracket'}
+              {form.format_type === 'round_robin' && 'Everyone plays everyone once - best record wins'}
+            </p>
+          </div>
           </div>
 
           {venues ? (
