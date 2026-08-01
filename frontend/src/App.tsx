@@ -39,6 +39,7 @@ import { ActivityLogPage } from './pages/admin/ActivityLogPage';
 
 // Staff portals — hidden, full-screen, no public navbar
 import { StaffLoginPage } from './pages/staff/StaffLoginPage';
+import { MatchAdminLoginPage } from './pages/staff/MatchAdminLoginPage';
 import { SuperAdminPage } from './pages/staff/SuperAdminPage';
 import { TurfOwnerPage } from './pages/staff/TurfOwnerPage';
 import { MatchAdminPage } from './pages/staff/MatchAdminPage';
@@ -54,6 +55,7 @@ export default function App() {
               {/* ── Staff portals (no public layout, full screen) ── */}
               <Route path="staff-login" element={<StaffLoginPage />} />
               <Route path="partner-login" element={<StaffLoginPage />} />
+              <Route path="match-admin-login" element={<MatchAdminLoginPage />} />
               <Route path="staff/admin" element={<SuperAdminPage />} />
               <Route path="staff/venue" element={<TurfOwnerPage />} />
               <Route path="staff/match" element={<MatchAdminPage />} />

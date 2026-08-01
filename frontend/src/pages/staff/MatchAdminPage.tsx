@@ -49,6 +49,7 @@ export function MatchAdminPage() {
   const [matches, setMatches] = useState<Match[]>([]);
   const [tab, setTab] = useState<'participants' | 'matches' | 'record'>('participants');
   const [msg, setMsg] = useState('');
+  const [msgType, setMsgType] = useState<'success' | 'error'>('success');
   const [loading, setLoading] = useState(true);
   const [showRemindDialog, setShowRemindDialog] = useState(false);
   const [selectedUsers, setSelectedUsers] = useState<number[]>([]);
@@ -56,10 +57,10 @@ export function MatchAdminPage() {
   const [scanError, setScanError] = useState('');
 
   useEffect(() => {
-    if (!user) { navigate('/partner-login', { replace: true }); return; }
+    if (!user) { navigate('/match-admin-login', { replace: true }); return; }
     // Only staff (match admin / owner / super admin) may view this portal.
     if (!user.is_match_admin && !user.is_venue_owner && !user.is_admin) {
-      navigate('/partner-login', { replace: true });
+      navigate('/match-admin-login', { replace: true });
       return;
     }
     ccApi.assignedTournaments()
@@ -146,11 +147,15 @@ export function MatchAdminPage() {
           <button type="button" className="staff-nav-btn" onClick={() => navigate('/staff/venue')}>← Venue portal</button>
         )}
         <button type="button" className="staff-nav-btn staff-nav-btn--logout"
-          onClick={() => { signOut(); navigate('/staff-login'); }}>Sign out</button>
+          onClick={() => { signOut(); navigate('/match-admin-login'); }}>Sign out</button>
       </aside>
 
       <main className="staff-main">
-        {msg ? <p className="staff-msg">{msg}</p> : null}
+        {msg ? (
+          <div className={`staff-msg ${msgType === 'error' ? 'staff-msg--error' : 'staff-msg--success'}`}>
+            {msgType === 'error' ? '⚠️ ' : '✓ '}{msg}
+          </div>
+        ) : null}
         {!selected ? (
           <div className="staff-section">
             <h2 className="staff-h2">No tournaments assigned</h2>
@@ -182,7 +187,7 @@ export function MatchAdminPage() {
                 tournamentId={selected.id}
                 participants={participants}
                 onChanged={() => void refreshData(selected)}
-                onMsg={setMsg}
+                onMsg={(msg, type) => { setMsg(msg); if (type) setMsgType(type); }}
               />
             )}
             {tab === 'matches' && <MatchList matches={matches} onVerify={async (id) => {
@@ -342,7 +347,7 @@ function ParticipantsList({ tournamentId, participants, onChanged, onMsg }: {
   tournamentId: number;
   participants: StaffParticipant[];
   onChanged: () => void;
-  onMsg: (m: string) => void;
+  onMsg: (m: string, type?: 'success' | 'error') => void;
 }) {
   const [code, setCode] = useState('');
   const [busy, setBusy] = useState(false);
@@ -414,10 +419,12 @@ function ParticipantsList({ tournamentId, participants, onChanged, onMsg }: {
     setBusy(true);
     try {
       const res = await ccApi.checkInParticipant(tournamentId, payload);
-      onMsg(res.message);
+      onMsg(res.message, 'success');
       setCode('');
       onChanged();
-    } catch (e) { onMsg(e instanceof ApiError ? e.message : 'Check-in failed'); }
+    } catch (e) { 
+      onMsg(e instanceof ApiError ? e.message : 'Check-in failed', 'error'); 
+    }
     finally { setBusy(false); }
   }
 

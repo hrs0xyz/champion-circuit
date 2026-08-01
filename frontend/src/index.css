@@ -5891,6 +5891,8 @@ a.contact-item:hover {
 .staff-h3 { font-size: 16px; font-weight: 700; margin: 0 0 12px; color: var(--text); }
 .staff-loading { color: var(--text-muted); font-size: 14px; padding: 40px; text-align: center; }
 .staff-msg { font-size: 14px; color: #4ade80; padding: 10px 14px; background: rgba(74,222,128,0.08); border: 1px solid rgba(74,222,128,0.2); border-radius: 8px; margin-bottom: 16px; }
+.staff-msg--success { color: #4ade80; background: rgba(74,222,128,0.08); border-color: rgba(74,222,128,0.2); }
+.staff-msg--error { color: #f87171; background: rgba(248,113,113,0.08); border-color: rgba(248,113,113,0.2); }
 .staff-msg--err { color: #f87171; background: rgba(248,113,113,0.08); border-color: rgba(248,113,113,0.2); }
 
 /* Stats grid */
