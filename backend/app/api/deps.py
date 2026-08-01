@@ -64,19 +64,35 @@ def is_tournament_admin(db: Session, user: User, tournament_id: int) -> bool:
 def require_tournament_manage_access(db: Session, user: User, tournament_id: int) -> Tournament:
     """
     Gate for managing a tournament (edit, stages, bracket, match admins).
-    Super admin: any tournament. Venue owner: only tournaments at their own venue.
+    Super admin: any tournament. 
+    Venue owner: only tournaments at their own venue.
+    Match admin: only tournaments they're assigned to.
     Returns the tournament or raises 403/404.
     """
     from app.services.venue import get_user_venue
 
-    if not user.is_admin and not user.is_venue_owner:
-        raise HTTPException(status_code=403, detail="Not authorised")
     t = db.get(Tournament, tournament_id)
     if not t:
         raise HTTPException(status_code=404, detail="Tournament not found")
-    if not user.is_admin:
+    
+    # Super admins can manage any tournament
+    if user.is_admin:
+        return t
+    
+    # Match admins can manage tournaments they're assigned to
+    assigned = db.query(TournamentAdmin).filter(
+        TournamentAdmin.tournament_id == tournament_id,
+        TournamentAdmin.user_id == user.id,
+    ).first()
+    if assigned:
+        return t
+    
+    # Venue owners can manage tournaments at their own venue
+    if user.is_venue_owner:
         my_venue = get_user_venue(db, user.id)
-        if not my_venue or t.venue_id != my_venue.id:
-            raise HTTPException(status_code=403, detail="You can only manage your own tournaments")
-    return t
+        if my_venue and t.venue_id == my_venue.id:
+            return t
+        raise HTTPException(status_code=403, detail="You can only manage your own tournaments")
+    
+    raise HTTPException(status_code=403, detail="Not authorised")
 
