@@ -22,11 +22,16 @@ _MATCH_BRACKET_COLS = {
     "next_match_slot":  "VARCHAR(1) DEFAULT '' NOT NULL",
     "is_bye":           "BOOLEAN DEFAULT FALSE NOT NULL",
     "scheduled_at":     "VARCHAR(30) DEFAULT '' NOT NULL",
+    "match_phase":      "VARCHAR(50) DEFAULT 'knockout' NOT NULL",
+    "group_id":         "INTEGER REFERENCES tournament_groups(id) ON DELETE SET NULL",
 }
 
 _TOURNAMENT_NEW_COLS = {
     "min_participants":          "INTEGER DEFAULT 0 NOT NULL",
     "awards_leaderboard_points": "BOOLEAN DEFAULT TRUE NOT NULL",
+    "format_type":               "VARCHAR(50) DEFAULT 'knockout' NOT NULL",
+    "group_config":              "TEXT DEFAULT NULL",
+    "current_phase":             "VARCHAR(50) DEFAULT 'registration' NOT NULL",
 }
 
 _REGISTRATION_NEW_COLS = {
@@ -139,12 +144,51 @@ def _ensure_postgres_schema() -> None:
             conn.execute(text(
                 "CREATE INDEX IF NOT EXISTS ix_matches_stage_id ON matches(stage_id)"
             ))
+            conn.execute(text(
+                "CREATE INDEX IF NOT EXISTS ix_matches_group_id ON matches(group_id)"
+            ))
 
         if "tournaments" in tables:
             existing = {c["name"] for c in inspector.get_columns("tournaments")}
             for col, defn in _TOURNAMENT_NEW_COLS.items():
                 if col not in existing:
                     conn.execute(text(f"ALTER TABLE tournaments ADD COLUMN IF NOT EXISTS {col} {defn}"))
+
+        # ── Group Stage tables ───────────────────────────────────────────────
+        if "tournament_groups" not in tables:
+            conn.execute(text("""
+                CREATE TABLE tournament_groups (
+                    id SERIAL PRIMARY KEY,
+                    tournament_id INTEGER NOT NULL REFERENCES tournaments(id) ON DELETE CASCADE,
+                    group_name VARCHAR(10) NOT NULL,
+                    group_order INTEGER NOT NULL,
+                    created_at TIMESTAMPTZ DEFAULT NOW()
+                )
+            """))
+            conn.execute(text("CREATE INDEX ix_tournament_groups_tournament_id ON tournament_groups(tournament_id)"))
+
+        if "tournament_group_members" not in tables:
+            conn.execute(text("""
+                CREATE TABLE tournament_group_members (
+                    id SERIAL PRIMARY KEY,
+                    group_id INTEGER NOT NULL REFERENCES tournament_groups(id) ON DELETE CASCADE,
+                    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                    points INTEGER DEFAULT 0 NOT NULL,
+                    wins INTEGER DEFAULT 0 NOT NULL,
+                    draws INTEGER DEFAULT 0 NOT NULL,
+                    losses INTEGER DEFAULT 0 NOT NULL,
+                    goals_for INTEGER DEFAULT 0 NOT NULL,
+                    goals_against INTEGER DEFAULT 0 NOT NULL,
+                    goal_difference INTEGER DEFAULT 0 NOT NULL,
+                    matches_played INTEGER DEFAULT 0 NOT NULL,
+                    position INTEGER,
+                    advanced_to_knockout BOOLEAN DEFAULT FALSE NOT NULL,
+                    created_at TIMESTAMPTZ DEFAULT NOW(),
+                    UNIQUE(group_id, user_id)
+                )
+            """))
+            conn.execute(text("CREATE INDEX ix_tournament_group_members_group_id ON tournament_group_members(group_id)"))
+            conn.execute(text("CREATE INDEX ix_tournament_group_members_user_id ON tournament_group_members(user_id)"))
 
         if "tournament_registrations" in tables:
             existing = {c["name"] for c in inspector.get_columns("tournament_registrations")}
@@ -286,12 +330,51 @@ def ensure_dev_schema() -> None:
             conn.execute(text(
                 "CREATE INDEX IF NOT EXISTS ix_matches_stage_id ON matches(stage_id)"
             ))
+            conn.execute(text(
+                "CREATE INDEX IF NOT EXISTS ix_matches_group_id ON matches(group_id)"
+            ))
 
         if "tournaments" in tables:
             t_cols = {c["name"] for c in inspector.get_columns("tournaments")}
             for col, defn in _TOURNAMENT_NEW_COLS.items():
                 if col not in t_cols:
                     _add_column(conn, "tournaments", col, _sqlite_defn(defn))
+
+        # ── Group Stage tables ───────────────────────────────────────────────
+        if "tournament_groups" not in tables:
+            conn.execute(text("""
+                CREATE TABLE tournament_groups (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    tournament_id INTEGER NOT NULL REFERENCES tournaments(id) ON DELETE CASCADE,
+                    group_name VARCHAR(10) NOT NULL,
+                    group_order INTEGER NOT NULL,
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+                )
+            """))
+            conn.execute(text("CREATE INDEX ix_tournament_groups_tournament_id ON tournament_groups(tournament_id)"))
+
+        if "tournament_group_members" not in tables:
+            conn.execute(text("""
+                CREATE TABLE tournament_group_members (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    group_id INTEGER NOT NULL REFERENCES tournament_groups(id) ON DELETE CASCADE,
+                    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                    points INTEGER DEFAULT 0 NOT NULL,
+                    wins INTEGER DEFAULT 0 NOT NULL,
+                    draws INTEGER DEFAULT 0 NOT NULL,
+                    losses INTEGER DEFAULT 0 NOT NULL,
+                    goals_for INTEGER DEFAULT 0 NOT NULL,
+                    goals_against INTEGER DEFAULT 0 NOT NULL,
+                    goal_difference INTEGER DEFAULT 0 NOT NULL,
+                    matches_played INTEGER DEFAULT 0 NOT NULL,
+                    position INTEGER,
+                    advanced_to_knockout INTEGER DEFAULT 0 NOT NULL,
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    UNIQUE(group_id, user_id)
+                )
+            """))
+            conn.execute(text("CREATE INDEX ix_tournament_group_members_group_id ON tournament_group_members(group_id)"))
+            conn.execute(text("CREATE INDEX ix_tournament_group_members_user_id ON tournament_group_members(user_id)"))
 
         if "tournament_registrations" in tables:
             reg_cols = {c["name"] for c in inspector.get_columns("tournament_registrations")}

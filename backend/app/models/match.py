@@ -62,6 +62,13 @@ class Match(Base):
     next_match_slot: Mapped[str] = mapped_column(String(1), default="", nullable=False)
     is_bye: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     scheduled_at: Mapped[str] = mapped_column(String(30), default="", nullable=False)  # ISO-8601
+    # ── Group stage fields ──
+    # Match phase: 'group_stage' | 'knockout'
+    match_phase: Mapped[str] = mapped_column(String(50), default="knockout", nullable=False)
+    # Reference to tournament group (NULL for knockout matches)
+    group_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("tournament_groups.id", ondelete="SET NULL"), nullable=True, index=True
+    )
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
@@ -188,6 +195,12 @@ class Tournament(Base):
     min_participants: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     # finish-position points feed the leaderboard when enabled
     awards_leaderboard_points: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    # Format type: knockout | groups_knockout | round_robin | round_robin_knockout
+    format_type: Mapped[str] = mapped_column(String(50), default="knockout", nullable=False)
+    # Group configuration as JSON string
+    group_config: Mapped[str] = mapped_column(Text, nullable=True)
+    # Current phase: registration | group_stage | knockout | completed
+    current_phase: Mapped[str] = mapped_column(String(50), default="registration", nullable=False)
     # draft | pending_approval | registration | live | completed | cancelled
     status: Mapped[str] = mapped_column(String(20), default="draft", nullable=False, index=True)
     is_exclusive: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
@@ -209,6 +222,10 @@ class Tournament(Base):
     stages: Mapped[list["TournamentStage"]] = relationship(
         "TournamentStage", back_populates="tournament",
         order_by="TournamentStage.stage_order", cascade="all, delete-orphan"
+    )
+    groups: Mapped[list["TournamentGroup"]] = relationship(
+        "TournamentGroup", back_populates="tournament",
+        order_by="TournamentGroup.group_order", cascade="all, delete-orphan"
     )
     venue: Mapped["Venue"] = relationship("Venue", foreign_keys=[venue_id])
 
@@ -509,3 +526,64 @@ class NewsArticle(Base):
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
     )
+
+
+
+# ── Group Stage Models ────────────────────────────────────────────────────────
+
+class TournamentGroup(Base):
+    """
+    A group in a group-stage tournament (Group A, B, C, D...).
+    Each group contains a subset of participants who play round-robin.
+    """
+    __tablename__ = "tournament_groups"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    tournament_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("tournaments.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    group_name: Mapped[str] = mapped_column(String(10), nullable=False)  # 'A', 'B', 'C', 'D'
+    group_order: Mapped[int] = mapped_column(Integer, nullable=False)    # 1, 2, 3, 4
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    tournament: Mapped["Tournament"] = relationship("Tournament", back_populates="groups")
+    members: Mapped[list["TournamentGroupMember"]] = relationship(
+        "TournamentGroupMember", back_populates="group",
+        order_by="TournamentGroupMember.position", cascade="all, delete-orphan"
+    )
+
+
+class TournamentGroupMember(Base):
+    """
+    A participant in a tournament group with their standings (points, wins, losses, etc).
+    Updated after each group-stage match verification.
+    """
+    __tablename__ = "tournament_group_members"
+    __table_args__ = (
+        UniqueConstraint("group_id", "user_id", name="uq_group_member"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    group_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("tournament_groups.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    user_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    points: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    wins: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    draws: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    losses: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    goals_for: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    goals_against: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    goal_difference: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    matches_played: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    position: Mapped[int] = mapped_column(Integer, nullable=True)  # Final standing (1, 2, 3...)
+    advanced_to_knockout: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    group: Mapped["TournamentGroup"] = relationship("TournamentGroup", back_populates="members")
