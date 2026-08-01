@@ -82,7 +82,7 @@ from app.models import activity as _activity_model  # noqa: F401
 
 # ── Create all tables (idempotent) ────────────────────────────────────────────
 Base.metadata.create_all(bind=engine)
-# ensure_dev_schema()  # TEMPORARILY DISABLED - causing deadlock
+ensure_dev_schema()  # Run migrations
 
 # ── Ensure upload directories exist ──────────────────────────────────────────
 # Path(settings.UPLOAD_DIR).mkdir(parents=True, exist_ok=True)

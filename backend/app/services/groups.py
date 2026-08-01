@@ -44,11 +44,12 @@ def generate_groups(
     Raises:
         ValueError: If validation fails
     """
-    # Validation
     if tournament.status != "registration":
         raise ValueError("Groups can only be generated during registration phase")
     
-    if tournament.format_type == "knockout":
+    # Check format supports groups (check both format and format_type for compatibility)
+    format_val = getattr(tournament, 'format_type', None) or tournament.format
+    if format_val == "knockout":
         raise ValueError("This tournament format doesn't use groups")
     
     # Check if groups already exist

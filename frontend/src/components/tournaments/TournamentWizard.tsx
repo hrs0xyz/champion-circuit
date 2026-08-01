@@ -360,7 +360,6 @@ export function TournamentWizard({ venues, isAdmin, create, onDone, onClose }: T
               {form.format_type === 'round_robin' && 'Everyone plays everyone once - best record wins'}
             </p>
           </div>
-          </div>
 
           {venues ? (
             <div className="auth-field">

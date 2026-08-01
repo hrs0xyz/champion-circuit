@@ -185,10 +185,15 @@ def verify_match(db: Session, match_id: int, admin_user_id: int) -> Match:
     is_bracket = bool(match.tournament_id) and match.round_number > 0
     winner_side = ""
     next_match: Match | None = None
-    if is_bracket:
+    
+    # Load tournament for both bracket matches AND group stage matches
+    needs_tournament = is_bracket or match.match_phase == "group_stage"
+    if needs_tournament:
         t_check = db.get(Tournament, match.tournament_id)
         if t_check and t_check.status == "cancelled":
             raise ValueError("The tournament has been cancelled — matches can no longer be verified")
+    
+    if is_bracket:
         winner_side = _bracket_winner_side(match)
         if match.next_match_id:
             next_match = db.get(Match, match.next_match_id)
@@ -220,8 +225,12 @@ def verify_match(db: Session, match_id: int, admin_user_id: int) -> Match:
 
     placements: list[tuple[int, int]] = []   # (user_id, position) — final only
     tournament: Tournament | None = None
-    if is_bracket:
+    
+    # Load tournament for bracket matches or group stage matches
+    if is_bracket or match.match_phase == "group_stage":
         tournament = db.get(Tournament, match.tournament_id)
+    
+    if is_bracket:
         if next_match:
             for p in match.participants:
                 if p.team == winner_side:
@@ -236,11 +245,14 @@ def verify_match(db: Session, match_id: int, admin_user_id: int) -> Match:
 
     # ── Group Stage Integration ──
     # Update group standings if this is a group match
+    print(f"🔍 DEBUG: match_phase={match.match_phase}, group_id={match.group_id}, tournament={tournament}")
     if match.match_phase == "group_stage" and match.group_id and tournament:
         import json
         group_config = json.loads(tournament.group_config or "{}")
+        print(f"🔍 DEBUG: Calling update_group_standings for match {match.id}, group {match.group_id}")
         from app.services.groups import update_group_standings
         update_group_standings(db, match, group_config)
+        print(f"✅ DEBUG: Group standings updated successfully")
 
     db.commit()
     db.refresh(match)

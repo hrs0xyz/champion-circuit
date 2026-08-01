@@ -938,3 +938,54 @@ def complete_group_stage_route(
         "phase": t.current_phase,
         "status": t.status,
     }
+
+
+@router.post("/admin/tournaments/{tournament_id}/recalculate-group-standings")
+def recalculate_group_standings_route(
+    tournament_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    DEBUG ENDPOINT: Recalculate group standings from all verified matches.
+    """
+    from app.services.groups import update_group_standings
+    from sqlalchemy import text
+    import json
+    
+    t = require_tournament_manage_access(db, current_user, tournament_id)
+    
+    # Get all verified group stage matches
+    matches = db.query(Match).filter(
+        Match.tournament_id == tournament_id,
+        Match.match_phase == "group_stage",
+        Match.status == "completed"
+    ).all()
+    
+    group_config = json.loads(t.group_config or "{}")
+    
+    # Reset all group members
+    db.execute(text("""
+        UPDATE tournament_group_members
+        SET points = 0, wins = 0, losses = 0, draws = 0,
+            goals_for = 0, goals_against = 0, matches_played = 0
+        WHERE group_id IN (
+            SELECT id FROM tournament_groups WHERE tournament_id = :tournament_id
+        )
+    """), {"tournament_id": tournament_id})
+    
+    # Recalculate standings for each match
+    count = 0
+    for match in matches:
+        if match.group_id:
+            print(f"📊 Recalculating match {match.id} in group {match.group_id}")
+            update_group_standings(db, match, group_config)
+            count += 1
+    
+    db.commit()
+    
+    return {
+        "success": True,
+        "matches_processed": count,
+        "message": f"Recalculated standings from {count} verified matches"
+    }
