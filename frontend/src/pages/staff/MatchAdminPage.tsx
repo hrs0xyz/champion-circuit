@@ -784,8 +784,9 @@ function TournamentManagement({ tournament, onUpdate, onMsg }: {
       onMsg(`Bracket generated — "${tournament.name}" is live.`, 'success');
       onUpdate();
     } catch (e) {
-      const errorMsg = e instanceof ApiError ? e.message : 'Failed to generate bracket';
       console.error('Generate bracket error:', e);
+      // Extract the actual error message from ApiError
+      const errorMsg = (e instanceof Error && e.message) ? e.message : 'Failed to generate bracket';
       onMsg(errorMsg, 'error');
     } finally {
       setBusy(false);
