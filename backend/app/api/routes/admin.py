@@ -830,3 +830,111 @@ def _user_summary(u: User) -> dict:
         "avatar_url": u.avatar_url,
         "created_at": u.created_at,
     }
+
+
+
+# ── Group Stage Routes ────────────────────────────────────────────────────────
+
+from pydantic import BaseModel
+
+class GenerateGroupsPayload(BaseModel):
+    num_groups: int
+    advance_per_group: int = 2
+    points_win: int = 3
+    points_draw: int = 1
+    points_loss: int = 0
+
+
+@router.post("/admin/tournaments/{tournament_id}/generate-groups")
+def generate_groups_route(
+    tournament_id: int,
+    payload: GenerateGroupsPayload,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Generate groups and round-robin matches for a group-stage tournament.
+    
+    - Creates N groups
+    - Distributes participants evenly
+    - Generates round-robin matches within each group
+    - Sets tournament phase to 'group_stage'
+    """
+    from app.services.groups import generate_groups
+    
+    t = require_tournament_manage_access(db, current_user, tournament_id)
+    
+    try:
+        groups, total_matches = generate_groups(
+            db, t,
+            num_groups=payload.num_groups,
+            advance_per_group=payload.advance_per_group,
+            points_win=payload.points_win,
+            points_draw=payload.points_draw,
+            points_loss=payload.points_loss,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    
+    return {
+        "message": f"Generated {len(groups)} groups with {total_matches} matches",
+        "groups": [
+            {
+                "id": g.id,
+                "name": g.group_name,
+                "order": g.group_order,
+            }
+            for g in groups
+        ],
+        "total_matches": total_matches,
+    }
+
+
+@router.get("/admin/tournaments/{tournament_id}/groups")
+def get_tournament_groups(
+    tournament_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Get all groups and their standings for a tournament.
+    """
+    from app.services.groups import get_group_standings
+    
+    # Anyone can view public tournament groups
+    t = db.get(Tournament, tournament_id)
+    if not t:
+        raise HTTPException(status_code=404, detail="Tournament not found")
+    
+    return get_group_standings(db, tournament_id)
+
+
+@router.post("/admin/tournaments/{tournament_id}/complete-group-stage")
+def complete_group_stage_route(
+    tournament_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Complete the group stage and generate knockout bracket with group winners.
+    
+    - Verifies all group matches are complete
+    - Finalizes group standings
+    - Advances top N from each group
+    - Generates knockout bracket
+    - Sets phase to 'knockout'
+    """
+    from app.services.groups import complete_group_stage
+    
+    t = require_tournament_manage_access(db, current_user, tournament_id)
+    
+    try:
+        complete_group_stage(db, t, current_user.id)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    
+    return {
+        "message": f"Group stage completed — knockout bracket generated",
+        "phase": t.current_phase,
+        "status": t.status,
+    }

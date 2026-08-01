@@ -688,3 +688,24 @@ def read_notifications(
 ):
     mark_notifications_read(db, current_user.id)
     return {"message": "All notifications marked as read"}
+
+
+
+# ── Public Group Standings ────────────────────────────────────────────────────
+
+@router.get("/tournaments/{tournament_id}/groups")
+def get_public_tournament_groups(
+    tournament_id: int,
+    db: Session = Depends(get_db),
+):
+    """
+    Public endpoint: Get group standings for a tournament.
+    Anyone can view this.
+    """
+    from app.services.groups import get_group_standings
+    
+    t = db.get(Tournament, tournament_id)
+    if not t:
+        raise HTTPException(status_code=404, detail="Tournament not found")
+    
+    return get_group_standings(db, tournament_id)
