@@ -47,7 +47,7 @@ export function MatchAdminPage() {
   const [selected, setSelected] = useState<Tournament | null>(null);
   const [participants, setParticipants] = useState<StaffParticipant[]>([]);
   const [matches, setMatches] = useState<Match[]>([]);
-  const [tab, setTab] = useState<'participants' | 'matches' | 'record'>('participants');
+  const [tab, setTab] = useState<'participants' | 'matches' | 'record' | 'tournaments'>('participants');
   const [msg, setMsg] = useState('');
   const [msgType, setMsgType] = useState<'success' | 'error'>('success');
   const [loading, setLoading] = useState(true);
@@ -173,7 +173,7 @@ export function MatchAdminPage() {
             </div>
 
             <div className="tab-row" style={{ marginBottom: 20 }}>
-              {(['participants', 'matches', 'record'] as const).map((t) => (
+              {(['participants', 'matches', 'record', 'tournaments'] as const).map((t) => (
                 <button key={t} type="button"
                   className={`tab-btn${tab === t ? ' is-active' : ''}`}
                   onClick={() => setTab(t)}>
@@ -218,6 +218,16 @@ export function MatchAdminPage() {
                 onDone={async () => {
                   await refreshData(selected);
                   setTab('matches'); setMsg('Match recorded.');
+                }}
+                onMsg={setMsg}
+              />
+            )}
+            {tab === 'tournaments' && selected && (
+              <TournamentManagement
+                tournament={selected}
+                onUpdate={() => {
+                  ccApi.assignedTournaments().then(setTournaments).catch(() => {});
+                  setMsg('Tournament updated.');
                 }}
                 onMsg={setMsg}
               />
@@ -735,6 +745,177 @@ function RecordMatch({ tournamentId, participants, onDone, onMsg }: {
           Record match
         </button>
       </form>
+    </div>
+  );
+}
+
+// ── Tournament Management (Match Admin powers) ───────────────────────────────
+function TournamentManagement({ tournament, onUpdate, onMsg }: {
+  tournament: Tournament;
+  onUpdate: () => void;
+  onMsg: (m: string) => void;
+}) {
+  const [busy, setBusy] = useState(false);
+  const [assigning, setAssigning] = useState(false);
+  const [assignUsername, setAssignUsername] = useState('');
+
+  async function toggleRegistration() {
+    try {
+      await ccApi.updateTournament(tournament.id, { registration_open: !tournament.registration_open });
+      onMsg(tournament.registration_open ? 'Registration closed.' : 'Registration opened.');
+      onUpdate();
+    } catch (e) {
+      onMsg(e instanceof ApiError ? e.message : 'Failed to update registration');
+    }
+  }
+
+  async function generateBracket() {
+    if (!window.confirm(
+      `Generate the knockout bracket for "${tournament.name}"?\n\n` +
+      `This closes registration, sets the tournament LIVE, and notifies every participant. It cannot be re-run.`,
+    )) return;
+    setBusy(true);
+    try {
+      await ccApi.generateBracket(tournament.id);
+      onMsg(`Bracket generated — "${tournament.name}" is live.`);
+      onUpdate();
+    } catch (e) {
+      onMsg(e instanceof ApiError ? e.message : 'Failed to generate bracket');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function cancelEvent() {
+    const reason = window.prompt(`Cancel "${tournament.name}"? Every registrant will be notified. Reason:`);
+    if (reason === null) return;
+    try {
+      await ccApi.cancelTournament(tournament.id, reason);
+      onMsg(`"${tournament.name}" cancelled.`);
+      onUpdate();
+    } catch (e) {
+      onMsg(e instanceof ApiError ? e.message : 'Failed to cancel tournament');
+    }
+  }
+
+  async function assignAdmin() {
+    if (!assignUsername.trim()) return;
+    try {
+      await ccApi.assignMatchAdmin(tournament.id, assignUsername.trim());
+      onMsg(`Assigned @${assignUsername} as match admin`);
+      setAssigning(false);
+      setAssignUsername('');
+    } catch (e) {
+      onMsg(e instanceof ApiError ? e.message : 'Failed to assign match admin');
+    }
+  }
+
+  return (
+    <div className="staff-section">
+      <h3 className="staff-h3">Tournament Management</h3>
+      <p className="muted small" style={{ marginBottom: 20 }}>
+        Manage tournament settings, registration, and bracket generation.
+      </p>
+
+      <div className="staff-card" style={{ marginBottom: 20 }}>
+        <div className="staff-card__header">
+          <div>
+            <h3 className="staff-card__title">{tournament.name}</h3>
+            <p className="staff-card__meta">
+              {tournament.game} · {tournament.mode} · {tournament.participant_count}/{tournament.max_participants} players
+              {tournament.entry_fee_paise === 0 ? ' · FREE' : ` · ₹${tournament.entry_fee_paise / 100}`}
+              {tournament.awards_leaderboard_points ? ' · points ON' : ' · points OFF'}
+            </p>
+          </div>
+          <span className="staff-badge">{tournament.status.replace('_', ' ')}</span>
+        </div>
+
+        <div className="staff-trn-actions" style={{ marginTop: 16 }}>
+          {tournament.status === 'registration' && (
+            <>
+              <button
+                type="button"
+                className="btn btn-secondary btn-sm"
+                onClick={() => void toggleRegistration()}
+              >
+                {tournament.registration_open ? 'Close registration' : 'Open registration'}
+              </button>
+              <button
+                type="button"
+                className="btn btn-primary btn-sm"
+                disabled={busy}
+                onClick={() => void generateBracket()}
+              >
+                {busy ? 'Generating…' : '⚔ Generate bracket'}
+              </button>
+            </>
+          )}
+          <button
+            type="button"
+            className="btn btn-secondary btn-sm"
+            onClick={() => setAssigning(!assigning)}
+          >
+            {assigning ? 'Cancel' : 'Assign match admin'}
+          </button>
+          {tournament.status !== 'completed' && tournament.status !== 'cancelled' && (
+            <button
+              type="button"
+              className="staff-action-btn staff-action-btn--danger"
+              onClick={() => void cancelEvent()}
+            >
+              Cancel event
+            </button>
+          )}
+        </div>
+
+        {assigning && (
+          <div className="staff-inline-form" style={{ marginTop: 16 }}>
+            <input
+              className="auth-input"
+              placeholder="@username"
+              value={assignUsername}
+              onChange={(e) => setAssignUsername(e.target.value)}
+              style={{ flex: 1 }}
+            />
+            <button type="button" className="btn btn-primary btn-sm" onClick={() => void assignAdmin()}>
+              Assign
+            </button>
+            <button type="button" className="btn btn-ghost btn-sm" onClick={() => setAssigning(false)}>
+              Cancel
+            </button>
+          </div>
+        )}
+      </div>
+
+      <div className="staff-card">
+        <h4 className="staff-h3">Tournament Details</h4>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 16, marginTop: 12 }}>
+          <div>
+            <p className="muted small" style={{ marginBottom: 4 }}>Registration Status</p>
+            <p style={{ margin: 0 }}>{tournament.registration_open ? '✅ Open' : '🚫 Closed'}</p>
+          </div>
+          <div>
+            <p className="muted small" style={{ marginBottom: 4 }}>Participants</p>
+            <p style={{ margin: 0 }}>{tournament.participant_count} / {tournament.max_participants}</p>
+          </div>
+          <div>
+            <p className="muted small" style={{ marginBottom: 4 }}>Entry Fee</p>
+            <p style={{ margin: 0 }}>{tournament.entry_fee_paise === 0 ? 'FREE' : `₹${tournament.entry_fee_paise / 100}`}</p>
+          </div>
+          <div>
+            <p className="muted small" style={{ marginBottom: 4 }}>Prize Pool</p>
+            <p style={{ margin: 0 }}>₹{tournament.prize_pool_paise / 100}</p>
+          </div>
+          <div>
+            <p className="muted small" style={{ marginBottom: 4 }}>Format</p>
+            <p style={{ margin: 0 }}>{tournament.format}</p>
+          </div>
+          <div>
+            <p className="muted small" style={{ marginBottom: 4 }}>Starts At</p>
+            <p style={{ margin: 0 }}>{new Date(tournament.starts_at).toLocaleDateString()}</p>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
