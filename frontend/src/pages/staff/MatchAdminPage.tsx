@@ -285,6 +285,9 @@ export function MatchAdminPage() {
             {tab === 'tournaments' && selected && (
               <TournamentManagement
                 tournament={selected}
+                matches={matches}
+                participants={participants}
+                onOpenBracketGenerator={() => void openBracketGenerator()}
                 onUpdate={() => {
                   ccApi.assignedTournaments().then(setTournaments).catch(() => {});
                   setMsg('Tournament updated.');
@@ -1171,8 +1174,11 @@ function RecordMatch({ tournamentId, participants, onDone, onMsg }: {
 }
 
 // ── Tournament Management (Match Admin powers) ───────────────────────────────
-function TournamentManagement({ tournament, onUpdate, onMsg }: {
+function TournamentManagement({ tournament, matches, participants, onOpenBracketGenerator, onUpdate, onMsg }: {
   tournament: Tournament;
+  matches: Match[];
+  participants: StaffParticipant[];
+  onOpenBracketGenerator: () => void;
   onUpdate: () => void;
   onMsg: (m: string, type?: 'success' | 'error') => void;
 }) {
@@ -1385,10 +1391,66 @@ function TournamentManagement({ tournament, onUpdate, onMsg }: {
               {tournament.awards_leaderboard_points ? ' · points ON' : ' · points OFF'}
             </p>
           </div>
-          <span className="staff-badge">{tournament.status.replace('_', ' ')}</span>
+          <span className={`staff-badge${tournament.status === 'live' || tournament.status === 'registration' ? ' staff-badge--active' : ''}`}>
+            {tournament.status.replace('_', ' ')}
+          </span>
+        </div>
+
+        {/* Tournament Status Explanation */}
+        <div style={{ marginTop: 16, padding: 12, background: '#0d1117', borderRadius: 8, fontSize: 14 }}>
+          <p style={{ margin: 0, color: '#9ca3af' }}>
+            <strong style={{ color: '#0abfbc' }}>Current Status:</strong>{' '}
+            {tournament.status === 'draft' && 'Tournament is in draft mode. Submit for approval when ready.'}
+            {tournament.status === 'pending_approval' && 'Waiting for admin approval. You can still edit while pending.'}
+            {tournament.status === 'registration' && `Registration is ${tournament.registration_open ? 'OPEN' : 'CLOSED'}. ${participants.filter(p => p.checked_in_at).length} participants checked in. Generate bracket to start matches.`}
+            {tournament.status === 'live' && 'Tournament is LIVE! Matches are in progress.'}
+            {tournament.status === 'completed' && 'Tournament has ended.'}
+            {tournament.status === 'cancelled' && 'Tournament was cancelled.'}
+          </p>
+        </div>
+
+        {/* Tournament Details Grid */}
+        <div style={{ marginTop: 20, display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 16, padding: 16, background: '#0a0f1a', borderRadius: 8 }}>
+          <div>
+            <p style={{ margin: '0 0 4px 0', fontSize: 12, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Registration Status</p>
+            <p style={{ margin: 0, fontSize: 16, fontWeight: 600, color: tournament.registration_open ? '#10b981' : '#ef4444' }}>
+              {tournament.registration_open ? '🟢 Open' : '🔴 Closed'}
+            </p>
+          </div>
+          <div>
+            <p style={{ margin: '0 0 4px 0', fontSize: 12, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Participants</p>
+            <p style={{ margin: 0, fontSize: 16, fontWeight: 600, color: '#fff' }}>
+              {tournament.participant_count} / {tournament.max_participants} {participants.filter(p => p.checked_in_at).length > 0 && `(${participants.filter(p => p.checked_in_at).length} checked in)`}
+            </p>
+          </div>
+          <div>
+            <p style={{ margin: '0 0 4px 0', fontSize: 12, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Entry Fee</p>
+            <p style={{ margin: 0, fontSize: 16, fontWeight: 600, color: '#10b981' }}>
+              {tournament.entry_fee_paise === 0 ? 'FREE' : `₹${tournament.entry_fee_paise / 100}`}
+            </p>
+          </div>
+          <div>
+            <p style={{ margin: '0 0 4px 0', fontSize: 12, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Prize Pool</p>
+            <p style={{ margin: 0, fontSize: 16, fontWeight: 600, color: '#0abfbc' }}>
+              ₹{tournament.prize_pool_inr || 0}
+            </p>
+          </div>
+          <div>
+            <p style={{ margin: '0 0 4px 0', fontSize: 12, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Format</p>
+            <p style={{ margin: 0, fontSize: 16, fontWeight: 600, color: '#fff', textTransform: 'capitalize' }}>
+              {tournament.format || 'knockout'}
+            </p>
+          </div>
+          <div>
+            <p style={{ margin: '0 0 4px 0', fontSize: 12, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Starts At</p>
+            <p style={{ margin: 0, fontSize: 16, fontWeight: 600, color: '#fff' }}>
+              {new Date(tournament.starts_at).toLocaleDateString()}
+            </p>
+          </div>
         </div>
 
         <div className="staff-trn-actions" style={{ marginTop: 16 }}>
+          {/* Show these buttons when registration is open or closed but not yet live */}
           {tournament.status === 'registration' && (
             <>
               <button
@@ -1396,17 +1458,26 @@ function TournamentManagement({ tournament, onUpdate, onMsg }: {
                 className="btn btn-secondary btn-sm"
                 onClick={() => void toggleRegistration()}
               >
-                {tournament.registration_open ? 'Close registration' : 'Open registration'}
+                {tournament.registration_open ? '🚫 Close registration' : '✅ Open registration'}
               </button>
               <button
                 type="button"
                 className="btn btn-primary btn-sm"
-                disabled={busy}
-                onClick={() => void openBracketGenerator()}
+                onClick={onOpenBracketGenerator}
               >
-                {busy ? 'Generating…' : matches.length > 0 ? '🔄 Regenerate bracket' : '⚔ Generate bracket'}
+                {matches.length > 0 ? '🔄 Regenerate bracket' : '⚔ Generate bracket'}
               </button>
             </>
+          )}
+          {/* Show regenerate for live tournaments too */}
+          {tournament.status === 'live' && (
+            <button
+              type="button"
+              className="btn btn-secondary btn-sm"
+              onClick={onOpenBracketGenerator}
+            >
+              🔄 Regenerate bracket
+            </button>
           )}
           <button
             type="button"
