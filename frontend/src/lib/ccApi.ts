@@ -340,13 +340,13 @@ export const ccApi = {
   myVenue: () => req<MyVenueData>('/api/staff/my-venue'),
   myTournaments: () => req<Tournament[]>('/api/staff/my-tournaments'),
   assignMatchAdmin: (tournamentId: number, username: string) =>
-    req<{ message: string }>(`/api/admin/tournaments/${tournamentId}/assign-match-admin`, {
+    req<{ message: string }>(`/api/staff/tournaments/${tournamentId}/assign-match-admin`, {
       method: 'POST', body: JSON.stringify({ username }),
     }),
   listTournamentAdmins: (tournamentId: number) =>
-    req<Array<{ user_id: number; username: string; name: string }>>(`/api/admin/tournaments/${tournamentId}/admins`),
+    req<Array<{ user_id: number; username: string; name: string }>>(`/api/staff/tournaments/${tournamentId}/admins`),
   removeMatchAdmin: (tournamentId: number, userId: number) =>
-    req<{ message: string }>(`/api/admin/tournaments/${tournamentId}/assign-match-admin/${userId}`, {
+    req<{ message: string }>(`/api/staff/tournaments/${tournamentId}/assign-match-admin/${userId}`, {
       method: 'DELETE',
     }),
 

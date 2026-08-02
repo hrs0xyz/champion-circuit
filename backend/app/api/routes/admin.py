@@ -312,6 +312,81 @@ def list_tournament_admins(
     return result
 
 
+# ── Staff/Match Admin — Same endpoints but under /api/staff prefix ────────────
+
+@router.post("/staff/tournaments/{tournament_id}/assign-match-admin")
+def staff_assign_match_admin(
+    tournament_id: int,
+    payload: dict,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Venue owners and match admins can assign other match admins."""
+    require_tournament_manage_access(db, current_user, tournament_id)
+
+    username = payload.get("username", "")
+    from app.services.users import get_user_by_username
+    target = get_user_by_username(db, username)
+    if not target:
+        raise HTTPException(status_code=404, detail=f"User @{username} not found")
+
+    # Check if already assigned
+    existing = db.query(TournamentAdmin).filter(
+        TournamentAdmin.tournament_id == tournament_id,
+        TournamentAdmin.user_id == target.id,
+    ).first()
+    if existing:
+        return {"message": f"@{username} is already a match admin for this tournament"}
+
+    ta = TournamentAdmin(
+        tournament_id=tournament_id,
+        user_id=target.id,
+        assigned_by=current_user.id,
+    )
+    db.add(ta)
+    db.commit()
+    return {"message": f"@{username} assigned as match admin for tournament #{tournament_id}"}
+
+
+@router.delete("/staff/tournaments/{tournament_id}/assign-match-admin/{user_id}")
+def staff_remove_match_admin(
+    tournament_id: int,
+    user_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Venue owners and match admins can remove other match admins."""
+    require_tournament_manage_access(db, current_user, tournament_id)
+    ta = db.query(TournamentAdmin).filter(
+        TournamentAdmin.tournament_id == tournament_id,
+        TournamentAdmin.user_id == user_id,
+    ).first()
+    if not ta:
+        raise HTTPException(status_code=404, detail="Assignment not found")
+    db.delete(ta)
+    db.commit()
+    return {"message": "Match admin removed"}
+
+
+@router.get("/staff/tournaments/{tournament_id}/admins")
+def staff_list_tournament_admins(
+    tournament_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Venue owners and match admins can view all match admins."""
+    require_tournament_manage_access(db, current_user, tournament_id)
+    admins = db.query(TournamentAdmin).filter(
+        TournamentAdmin.tournament_id == tournament_id
+    ).all()
+    result = []
+    for ta in admins:
+        u = db.get(User, ta.user_id)
+        if u:
+            result.append({"user_id": u.id, "username": u.username, "name": u.name})
+    return result
+
+
 # ── Tournament management (stages, bracket, lifecycle) ────────────────────────
 
 @router.get("/admin/tournaments")
