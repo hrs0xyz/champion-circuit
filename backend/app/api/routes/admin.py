@@ -1113,20 +1113,67 @@ def staff_generate_bracket_route(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """Staff version of generate bracket."""
+    """Staff version of generate bracket - supports multiple formats."""
     if not is_tournament_admin(db, current_user, tournament_id):
         raise HTTPException(status_code=403, detail="Not assigned to this tournament")
     t = db.get(Tournament, tournament_id)
     if not t:
         raise HTTPException(status_code=404, detail="Tournament not found")
-    try:
-        generate_bracket(
-            db, t.id, current_user.id,
-            (payload.round_stage_map if payload else None) or None,
+    
+    format_choice = payload.format if payload else "knockout"
+    
+    # Different formats use different generation functions
+    if format_choice == "round_robin":
+        # Round robin: everyone plays everyone using group generation
+        from app.services.groups import generate_groups
+        try:
+            # Set format
+            t.format = "round_robin"
+            t.format_type = "round_robin"
+            db.commit()
+            
+            # Generate single group with all participants
+            checked_in_count = db.query(TournamentRegistration).filter(
+                TournamentRegistration.tournament_id == tournament_id,
+                TournamentRegistration.checked_in_at != None
+            ).count()
+            
+            groups, total_matches = generate_groups(
+                db, t,
+                num_groups=1,  # Single group = everyone plays everyone
+                advance_per_group=checked_in_count,  # Everyone advances (no elimination)
+                points_win=3,
+                points_draw=1,
+                points_loss=0,
+            )
+            return {
+                "message": f"Round robin generated with {total_matches} matches",
+                "format": "round_robin",
+                "total_matches": total_matches,
+            }
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e))
+    
+    elif format_choice in ["knockout", "page_playoff", "swiss"]:
+        # These all use knockout bracket generation
+        try:
+            t.format = "knockout"
+            t.format_type = "knockout"
+            db.commit()
+            
+            generate_bracket(
+                db, t.id, current_user.id,
+                (payload.round_stage_map if payload else None) or None,
+            )
+            return serialize_bracket(t, db)
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e))
+    
+    else:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Format '{format_choice}' not yet implemented. Use 'knockout' or 'round_robin'."
         )
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-    return serialize_bracket(t, db)
 
 
 # ── Group Stage Routes ────────────────────────────────────────────────────────
