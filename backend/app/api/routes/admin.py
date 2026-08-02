@@ -1094,21 +1094,32 @@ def get_format_suggestions(
         "cons": ["Players eliminated after 1 loss", "No second chances", "Unequal match counts with byes"],
     })
     
-    # Page Playoff System (for exactly 4-6 players) - FAIR and EFFICIENT
-    if checked_in >= 4 and checked_in <= 6:
-        # Page System: Top 4 after qualification/seeding
+    # Page Playoff System (for exactly 4 players ONLY) - FAIR and EFFICIENT
+    if checked_in == 4:
+        # Page System for 4 players:
         # Match 1: Seed 1 vs Seed 2 (winner to final)
         # Match 2: Seed 3 vs Seed 4 (loser eliminated)
         # Match 3: Loser of Match 1 vs Winner of Match 2
         # Match 4: Final
         suggestions.append({
             "format": "page_playoff",
-            "name": f"Page Playoff System",
+            "name": "Page Playoff System",
             "description": "Top seeds get advantage: 1v2 winner goes to final, 3v4 loser eliminated, others compete for final spot",
-            "total_matches": 4 if checked_in == 4 else (rr_matches // 2 + 4),
-            "recommended": checked_in >= 4 and checked_in <= 6,
+            "total_matches": 4,
+            "recommended": True,
             "pros": ["Fair with seeding advantage", "Everyone plays 2-3 matches", "Efficient", "Rewards top seeds"],
             "cons": ["Requires proper seeding", "Complex for participants to understand"],
+        })
+    elif checked_in >= 5 and checked_in <= 6:
+        # Show as unavailable for 5-6 players
+        suggestions.append({
+            "format": "page_playoff",
+            "name": "Page Playoff System",
+            "description": "Works best with exactly 4 participants",
+            "total_matches": 0,  # Mark as unavailable
+            "recommended": False,
+            "pros": [],
+            "cons": ["Requires exactly 4 participants"],
         })
     
     # Double Elimination (for 6+ players)
