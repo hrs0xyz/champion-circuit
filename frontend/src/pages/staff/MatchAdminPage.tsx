@@ -58,6 +58,7 @@ export function MatchAdminPage() {
   const [showBracketDialog, setShowBracketDialog] = useState(false);
   const [formatSuggestions, setFormatSuggestions] = useState<any>(null);
   const [selectedFormat, setSelectedFormat] = useState<string>('');
+  const [busy, setBusy] = useState(false);
 
   useEffect(() => {
     if (!user) { navigate('/match-admin-login', { replace: true }); return; }
@@ -117,6 +118,50 @@ export function MatchAdminPage() {
       setSelectedUsers([]);
     } catch (e) { 
       setMsg(e instanceof ApiError ? e.message : 'Failed.'); 
+    }
+  }
+
+  async function openBracketGenerator() {
+    if (!selected) return;
+    try {
+      const suggestions = await ccApi.getFormatSuggestions(selected.id);
+      setFormatSuggestions(suggestions);
+      
+      // Pre-select recommended format
+      const recommended = suggestions.suggestions.find((s: any) => s.recommended);
+      if (recommended) {
+        setSelectedFormat(recommended.format);
+      }
+      
+      setShowBracketDialog(true);
+    } catch (e) {
+      setMsg(e instanceof ApiError ? e.message : 'Failed to load format suggestions');
+    }
+  }
+
+  async function generateBracketWithFormat() {
+    if (!selected || !selectedFormat) return;
+    try {
+      setBusy(true);
+      const hasExistingMatches = matches.length > 0;
+      
+      if (hasExistingMatches) {
+        // Regenerate
+        await ccApi.regenerateBracket(selected.id, { format: selectedFormat });
+        setMsg('Bracket regenerated successfully!');
+      } else {
+        // First time generation
+        await ccApi.generateBracket(selected.id, {});
+        setMsg('Bracket generated successfully!');
+      }
+      
+      await refreshData(selected);
+      setShowBracketDialog(false);
+      setTab('matches');
+    } catch (e) {
+      setMsg(e instanceof ApiError ? e.message : 'Failed to generate bracket');
+    } finally {
+      setBusy(false);
     }
   }
 
@@ -361,6 +406,148 @@ export function MatchAdminPage() {
                 {selectedUsers.length > 0 
                   ? `📧 Send to ${selectedUsers.length} Selected` 
                   : `📧 Send to All ${participants.filter(p => !p.checked_in_at).length} Non-Checked-In`}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Bracket Generation Dialog */}
+      {showBracketDialog && selected && formatSuggestions && (
+        <div className="modal-overlay" onClick={() => setShowBracketDialog(false)}>
+          <div className="modal-content" style={{ maxWidth: 900 }} onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2 className="modal-title">
+                {matches.length > 0 ? '🔄 Regenerate Tournament Bracket' : '⚔ Generate Tournament Bracket'}
+              </h2>
+              <button type="button" className="modal-close" onClick={() => setShowBracketDialog(false)}>×</button>
+            </div>
+            <div className="modal-body">
+              {matches.length > 0 && (
+                <div style={{ marginBottom: 24, padding: 16, background: '#dc262622', border: '1px solid #dc2626', borderRadius: 8 }}>
+                  <p style={{ margin: 0, fontSize: 14, color: '#fca5a5', lineHeight: 1.6 }}>
+                    ⚠️ <strong>Warning:</strong> Regenerating will delete all existing matches and teams. This action cannot be undone. Only do this if you need to start over with a different format.
+                  </p>
+                </div>
+              )}
+
+              <div style={{ marginBottom: 16 }}>
+                <p style={{ color: '#d4d4d8', marginBottom: 8 }}>
+                  <strong>{formatSuggestions.checked_in_count}</strong> participants have checked in
+                </p>
+                <p style={{ color: '#9ca3af', fontSize: 14, marginBottom: 20 }}>
+                  Select the tournament format that works best for your event:
+                </p>
+              </div>
+
+              {/* Format Cards */}
+              <div style={{ display: 'grid', gap: 16, marginBottom: 24 }}>
+                {formatSuggestions.suggestions.map((suggestion: any) => (
+                  <div
+                    key={suggestion.format}
+                    onClick={() => setSelectedFormat(suggestion.format)}
+                    style={{
+                      padding: 20,
+                      background: selectedFormat === suggestion.format ? '#0abfbc22' : '#0d1117',
+                      border: `2px solid ${selectedFormat === suggestion.format ? '#0abfbc' : '#2a3544'}`,
+                      borderRadius: 12,
+                      cursor: 'pointer',
+                      transition: 'all 0.2s',
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 12 }}>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                          <h3 style={{ margin: 0, fontSize: 18, fontWeight: 600, color: '#fff' }}>
+                            {suggestion.name}
+                          </h3>
+                          {suggestion.recommended && (
+                            <span style={{
+                              padding: '2px 8px',
+                              background: '#0abfbc',
+                              color: '#000',
+                              fontSize: 11,
+                              fontWeight: 700,
+                              borderRadius: 4,
+                              textTransform: 'uppercase',
+                              letterSpacing: '0.5px'
+                            }}>
+                              Recommended
+                            </span>
+                          )}
+                        </div>
+                        <p style={{ margin: '0 0 12px 0', color: '#9ca3af', fontSize: 14 }}>
+                          {suggestion.description}
+                        </p>
+                        <p style={{ margin: 0, color: '#0abfbc', fontSize: 13, fontWeight: 500 }}>
+                          📊 {suggestion.total_matches} total matches
+                        </p>
+                      </div>
+                      <div style={{
+                        width: 24,
+                        height: 24,
+                        borderRadius: '50%',
+                        border: `2px solid ${selectedFormat === suggestion.format ? '#0abfbc' : '#6b7280'}`,
+                        background: selectedFormat === suggestion.format ? '#0abfbc' : 'transparent',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        flexShrink: 0,
+                        marginLeft: 16,
+                      }}>
+                        {selectedFormat === suggestion.format && (
+                          <span style={{ color: '#000', fontSize: 14, fontWeight: 900 }}>✓</span>
+                        )}
+                      </div>
+                    </div>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+                      <div>
+                        <p style={{ margin: '0 0 6px 0', fontSize: 12, fontWeight: 600, color: '#10b981', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                          Pros
+                        </p>
+                        <ul style={{ margin: 0, paddingLeft: 20, color: '#d4d4d8', fontSize: 13, lineHeight: 1.8 }}>
+                          {suggestion.pros.map((pro: string, i: number) => (
+                            <li key={i}>{pro}</li>
+                          ))}
+                        </ul>
+                      </div>
+                      <div>
+                        <p style={{ margin: '0 0 6px 0', fontSize: 12, fontWeight: 600, color: '#ef4444', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                          Cons
+                        </p>
+                        <ul style={{ margin: 0, paddingLeft: 20, color: '#d4d4d8', fontSize: 13, lineHeight: 1.8 }}>
+                          {suggestion.cons.map((con: string, i: number) => (
+                            <li key={i}>{con}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {selectedFormat && (
+                <div style={{ padding: 16, background: '#0abfbc11', border: '1px solid #0abfbc', borderRadius: 8 }}>
+                  <p style={{ margin: 0, fontSize: 14, color: '#d4d4d8' }}>
+                    ✓ Format selected: <strong style={{ color: '#0abfbc' }}>
+                      {formatSuggestions.suggestions.find((s: any) => s.format === selectedFormat)?.name}
+                    </strong>
+                  </p>
+                </div>
+              )}
+            </div>
+            <div className="modal-footer">
+              <button type="button" className="btn btn-ghost" onClick={() => setShowBracketDialog(false)}>
+                Cancel
+              </button>
+              <button 
+                type="button" 
+                className="btn btn-primary" 
+                onClick={() => void generateBracketWithFormat()}
+                disabled={!selectedFormat || busy}
+              >
+                {busy ? 'Generating...' : matches.length > 0 ? '🔄 Regenerate Bracket' : '⚔ Generate Bracket'}
               </button>
             </div>
           </div>
@@ -998,9 +1185,9 @@ function TournamentManagement({ tournament, onUpdate, onMsg }: {
                 type="button"
                 className="btn btn-primary btn-sm"
                 disabled={busy}
-                onClick={() => void generateBracket()}
+                onClick={() => void openBracketGenerator()}
               >
-                {busy ? 'Generating…' : '⚔ Generate bracket'}
+                {busy ? 'Generating…' : matches.length > 0 ? '🔄 Regenerate bracket' : '⚔ Generate bracket'}
               </button>
             </>
           )}
