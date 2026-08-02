@@ -172,6 +172,7 @@ export function MatchAdminPage() {
       setTab('matches');
     } catch (e) {
       setMsg(e instanceof ApiError ? e.message : 'Failed to generate bracket');
+      setMsgType('error');
     } finally {
       setBusy(false);
     }
