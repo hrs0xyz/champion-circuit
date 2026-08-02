@@ -968,7 +968,7 @@ def get_format_suggestions(
     # Count checked-in participants
     checked_in = db.query(TournamentRegistration).filter(
         TournamentRegistration.tournament_id == tournament_id,
-        TournamentRegistration.checked_in == True
+        TournamentRegistration.checked_in_at != None
     ).count()
     
     suggestions = []
