@@ -491,9 +491,6 @@ def regenerate_bracket(
         db.query(MatchParticipant).filter(MatchParticipant.match_id == match.id).delete()
         db.delete(match)
     
-    # Delete all teams
-    db.query(Team).filter(Team.tournament_id == tournament_id).delete()
-    
     # Clear tournament format if switching
     if payload.format:
         t.format = payload.format
