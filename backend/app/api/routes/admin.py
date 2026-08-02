@@ -481,7 +481,7 @@ def regenerate_bracket(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """Delete existing bracket and regenerate with new format."""
+    """Delete existing bracket and regenerate with new format. v2"""
     t = require_tournament_manage_access(db, current_user, tournament_id)
     
     # Delete all existing matches for this tournament
