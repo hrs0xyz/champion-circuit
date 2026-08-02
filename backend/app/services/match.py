@@ -369,11 +369,13 @@ def compute_leaderboard(
     scope_id: str = "",
     period_type: str = "all_time",
     period_key: str = "",
+    game: str = "",
     limit: int = 100,
 ) -> list[dict]:
     """
     Compute leaderboard from match_participants + score_adjustments.
     period_type: all_time (default) | weekly (last 7 days) | monthly (last 30 days).
+    game: filter by tournament game (e.g., 'cricket', 'chess', 'bgmi').
     Returns list of dicts sorted by total_points desc.
     """
     from collections import defaultdict
@@ -388,9 +390,10 @@ def compute_leaderboard(
     # Gather points from verified matches (byes are auto-completed placeholders
     # with no result — they must not count as matches played)
     q = (
-        db.query(MatchParticipant, Match, User)
+        db.query(MatchParticipant, Match, User, Tournament)
         .join(Match, MatchParticipant.match_id == Match.id)
         .join(User, MatchParticipant.user_id == User.id)
+        .outerjoin(Tournament, Match.tournament_id == Tournament.id)
         .filter(Match.status == "completed")
         .filter(Match.is_bye == False)  # noqa: E712
     )
@@ -401,6 +404,12 @@ def compute_leaderboard(
         q = q.filter(Match.venue_id == int(scope_id))
     elif scope_type == "city" and scope_id:
         q = q.filter(User.city.ilike(scope_id))
+    elif scope_type == "tournament" and scope_id:
+        q = q.filter(Match.tournament_id == int(scope_id))
+    
+    # Filter by game if specified
+    if game:
+        q = q.filter(Tournament.game.ilike(game))
 
     rows = q.all()
 
@@ -409,7 +418,7 @@ def compute_leaderboard(
         "user": None,
     })
 
-    for participant, _match, user in rows:
+    for participant, _match, user, tournament in rows:
         s = stats[user.id]
         s["user"] = user
         s["total_points"] += participant.points_earned

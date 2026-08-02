@@ -52,11 +52,26 @@ export function LeaderboardPage() {
     setLoading(true);
     const scopeType = selectedTournament ? 'tournament' : (cities.length === 1 ? 'city' : 'global');
     const scopeId = selectedTournament ? String(selectedTournament) : (cities.length === 1 ? cities[0] : '');
-    ccApi.leaderboard({ scope_type: scopeType, scope_id: scopeId, period_type: period, limit: 100 })
+    
+    // Map UI sport names to backend game values
+    let gameFilter = '';
+    if (sport !== 'All') {
+      gameFilter = sport.toLowerCase()
+        .replace(' ', '_')  // "Table Tennis" -> "table_tennis"
+        .replace('-', '_'); // handle any dashes
+    }
+    
+    ccApi.leaderboard({ 
+      scope_type: scopeType, 
+      scope_id: scopeId, 
+      period_type: period, 
+      game: gameFilter,
+      limit: 100 
+    })
       .then(setRows)
       .catch(() => setRows([]))
       .finally(() => setLoading(false));
-  }, [cities, period, selectedTournament]);
+  }, [cities, period, selectedTournament, sport]);
 
   // Fuzzy search tournaments
   const filteredTournaments = tournaments.filter((t) => {
@@ -64,10 +79,7 @@ export function LeaderboardPage() {
     return t.name.toLowerCase().includes(tournamentSearch.toLowerCase());
   });
 
-  // Client-side sport filter (we don't have sport breakdown from backend yet)
-  // The backend will support this when tournament.game is wired to leaderboard
-  const filtered = rows;
-  const myRow = user ? filtered.find((r) => r.user_id === user.id) : null;
+  const myRow = user ? rows.find((r) => r.user_id === user.id) : null;
 
   return (
     <section className="section section-leaderboard">

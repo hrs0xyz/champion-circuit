@@ -373,7 +373,7 @@ export const ccApi = {
   userScore: (userId: number) => req<{ user_id: number; total_points: number }>(`/api/scores/user/${userId}`),
 
   // Leaderboard
-  leaderboard: (params: { scope_type?: string; scope_id?: string; period_type?: string; limit?: number } = {}) => {
+  leaderboard: (params: { scope_type?: string; scope_id?: string; period_type?: string; game?: string; limit?: number } = {}) => {
     const qs = new URLSearchParams(
       Object.fromEntries(Object.entries(params).filter(([, v]) => v !== undefined).map(([k, v]) => [k, String(v)]))
     ).toString();

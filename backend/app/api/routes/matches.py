@@ -199,6 +199,7 @@ def leaderboard(
     scope_type: str = "global",
     scope_id: str = "",
     period_type: str = "all_time",
+    game: str = "",
     limit: int = 100,
     db: Session = Depends(get_db),
 ):
@@ -207,6 +208,7 @@ def leaderboard(
         scope_type=scope_type,
         scope_id=scope_id,
         period_type=period_type,
+        game=game,
         limit=min(limit, 200),
     )
     return rows
@@ -405,20 +407,24 @@ def update_tournament(
                        "ask the platform admin to send it back to draft first",
             )
         
-        # Match admins can only edit participant limits, not other fields
+        # Match admins can only edit participant limits and registration_open, not other fields
         if is_match_admin and t.status != "draft":
-            allowed_fields = {"min_participants", "max_participants"}
+            allowed_fields = {"min_participants", "max_participants", "registration_open"}
             disallowed = set(data.keys()) - allowed_fields
             if disallowed:
                 raise HTTPException(
                     status_code=403,
-                    detail=f"Match admins can only edit min/max participants. Cannot edit: {', '.join(disallowed)}",
+                    detail=f"Match admins can only edit min/max participants and registration status. Cannot edit: {', '.join(disallowed)}",
                 )
         
-        # Lock certain fields for non-admins
-        for locked in ("status", "is_featured", "venue_id", "listing_id", "registration_open"):
-            if locked in data and not is_match_admin:
+        # Lock certain fields for non-admins (but allow match admins to edit registration_open)
+        for locked in ("status", "is_featured", "venue_id", "listing_id"):
+            if locked in data:
                 data.pop(locked, None)
+        
+        # Only block registration_open for venue owners, not match admins
+        if "registration_open" in data and not is_match_admin:
+            data.pop("registration_open", None)
     if "venue_id" in data:
         data["venue_id"] = data["venue_id"] or None
     if "listing_id" in data:
