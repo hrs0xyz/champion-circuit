@@ -774,8 +774,15 @@ function TournamentManagement({ tournament, onUpdate, onMsg }: {
   const [assignUsername, setAssignUsername] = useState('');
   const [editing, setEditing] = useState(false);
   const [editForm, setEditForm] = useState({
+    name: tournament.name,
     min_participants: tournament.min_participants,
     max_participants: tournament.max_participants,
+    prize_pool_inr: tournament.prize_pool_inr || 0,
+    prize_description: tournament.prize_description || '',
+    entry_fee_paise: tournament.entry_fee_paise || 0,
+    description: tournament.description || '',
+    rules: tournament.rules || '',
+    registration_deadline: tournament.registration_deadline || '',
   });
 
   async function toggleRegistration() {
@@ -835,8 +842,15 @@ function TournamentManagement({ tournament, onUpdate, onMsg }: {
   async function saveSettings() {
     try {
       await ccApi.updateTournament(tournament.id, {
+        name: editForm.name,
         min_participants: editForm.min_participants,
         max_participants: editForm.max_participants,
+        prize_pool_inr: editForm.prize_pool_inr,
+        prize_description: editForm.prize_description,
+        entry_fee_paise: editForm.entry_fee_paise,
+        description: editForm.description,
+        rules: editForm.rules,
+        registration_deadline: editForm.registration_deadline,
       });
       onMsg('Tournament settings updated.', 'success');
       setEditing(false);
@@ -914,7 +928,18 @@ function TournamentManagement({ tournament, onUpdate, onMsg }: {
         {editing && (
           <div className="staff-card" style={{ marginTop: 16, background: '#0a0f1a' }}>
             <h4 className="staff-h3" style={{ marginBottom: 16 }}>Edit Tournament Settings</h4>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+            
+            <div className="auth-field" style={{ marginBottom: 16 }}>
+              <label className="auth-label">Tournament Name</label>
+              <input
+                type="text"
+                className="auth-input"
+                value={editForm.name}
+                onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
+              />
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
               <div className="auth-field">
                 <label className="auth-label">Minimum Participants</label>
                 <input
@@ -939,6 +964,74 @@ function TournamentManagement({ tournament, onUpdate, onMsg }: {
                 />
               </div>
             </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
+              <div className="auth-field">
+                <label className="auth-label">Entry Fee (₹)</label>
+                <input
+                  type="number"
+                  className="auth-input"
+                  value={editForm.entry_fee_paise / 100}
+                  onChange={(e) => setEditForm({ ...editForm, entry_fee_paise: Math.round(Number(e.target.value) * 100) })}
+                  min={0}
+                  step={1}
+                />
+              </div>
+              <div className="auth-field">
+                <label className="auth-label">Prize Pool (₹)</label>
+                <input
+                  type="number"
+                  className="auth-input"
+                  value={editForm.prize_pool_inr}
+                  onChange={(e) => setEditForm({ ...editForm, prize_pool_inr: Number(e.target.value) })}
+                  min={0}
+                />
+              </div>
+            </div>
+
+            <div className="auth-field" style={{ marginBottom: 16 }}>
+              <label className="auth-label">Prize Description</label>
+              <input
+                type="text"
+                className="auth-input"
+                value={editForm.prize_description}
+                onChange={(e) => setEditForm({ ...editForm, prize_description: e.target.value })}
+                placeholder="e.g., Trophies for top 3, Gift cards"
+              />
+            </div>
+
+            <div className="auth-field" style={{ marginBottom: 16 }}>
+              <label className="auth-label">Registration Deadline</label>
+              <input
+                type="datetime-local"
+                className="auth-input"
+                value={editForm.registration_deadline ? new Date(editForm.registration_deadline).toISOString().slice(0, 16) : ''}
+                onChange={(e) => setEditForm({ ...editForm, registration_deadline: e.target.value ? new Date(e.target.value).toISOString() : '' })}
+              />
+            </div>
+
+            <div className="auth-field" style={{ marginBottom: 16 }}>
+              <label className="auth-label">Description</label>
+              <textarea
+                className="auth-input"
+                value={editForm.description}
+                onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
+                rows={4}
+                placeholder="Tell players what to expect from this tournament..."
+              />
+            </div>
+
+            <div className="auth-field" style={{ marginBottom: 16 }}>
+              <label className="auth-label">Rules</label>
+              <textarea
+                className="auth-input"
+                value={editForm.rules}
+                onChange={(e) => setEditForm({ ...editForm, rules: e.target.value })}
+                rows={4}
+                placeholder="Tournament rules, format, scoring system..."
+              />
+            </div>
+
             <div style={{ display: 'flex', gap: 12, marginTop: 16 }}>
               <button type="button" className="btn btn-primary btn-sm" onClick={() => void saveSettings()}>
                 Save changes
