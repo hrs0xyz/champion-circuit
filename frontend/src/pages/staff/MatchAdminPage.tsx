@@ -458,89 +458,132 @@ export function MatchAdminPage() {
 
               {/* Format Cards */}
               <div style={{ display: 'grid', gap: 16, marginBottom: 24 }}>
-                {formatSuggestions.suggestions.map((suggestion: any) => (
-                  <div
-                    key={suggestion.format}
-                    onClick={() => setSelectedFormat(suggestion.format)}
-                    style={{
-                      padding: 20,
-                      background: selectedFormat === suggestion.format ? '#0abfbc22' : '#0d1117',
-                      border: `2px solid ${selectedFormat === suggestion.format ? '#0abfbc' : '#2a3544'}`,
-                      borderRadius: 12,
-                      cursor: 'pointer',
-                      transition: 'all 0.2s',
-                    }}
-                  >
-                    <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 12 }}>
-                      <div style={{ flex: 1 }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                          <h3 style={{ margin: 0, fontSize: 18, fontWeight: 600, color: '#fff' }}>
-                            {suggestion.name}
-                          </h3>
-                          {suggestion.recommended && (
-                            <span style={{
-                              padding: '2px 8px',
-                              background: '#0abfbc',
-                              color: '#000',
-                              fontSize: 11,
-                              fontWeight: 700,
-                              borderRadius: 4,
-                              textTransform: 'uppercase',
-                              letterSpacing: '0.5px'
-                            }}>
-                              Recommended
-                            </span>
+                {formatSuggestions.suggestions.map((suggestion: any) => {
+                  // Determine if format is disabled (not_enough or not feasible)
+                  const isDisabled = suggestion.format === 'not_enough' || suggestion.total_matches === 0;
+                  const disabledReason = suggestion.format === 'not_enough' 
+                    ? 'Need at least 3 checked-in participants'
+                    : suggestion.cons[0] || 'Not feasible for current participant count';
+                  
+                  return (
+                    <div
+                      key={suggestion.format}
+                      onClick={() => !isDisabled && setSelectedFormat(suggestion.format)}
+                      style={{
+                        padding: 20,
+                        background: isDisabled 
+                          ? '#18181b' 
+                          : selectedFormat === suggestion.format ? '#0abfbc22' : '#0d1117',
+                        border: `2px solid ${
+                          isDisabled 
+                            ? '#3f3f46'
+                            : selectedFormat === suggestion.format ? '#0abfbc' : '#2a3544'
+                        }`,
+                        borderRadius: 12,
+                        cursor: isDisabled ? 'not-allowed' : 'pointer',
+                        opacity: isDisabled ? 0.5 : 1,
+                        transition: 'all 0.2s',
+                        position: 'relative',
+                      }}
+                    >
+                      {isDisabled && (
+                        <div style={{
+                          position: 'absolute',
+                          top: 12,
+                          right: 12,
+                          padding: '4px 12px',
+                          background: '#ef4444',
+                          color: '#fff',
+                          fontSize: 11,
+                          fontWeight: 700,
+                          borderRadius: 4,
+                          textTransform: 'uppercase',
+                          letterSpacing: '0.5px',
+                        }}>
+                          Not Available
+                        </div>
+                      )}
+                      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 12 }}>
+                        <div style={{ flex: 1 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                            <h3 style={{ margin: 0, fontSize: 18, fontWeight: 600, color: isDisabled ? '#71717a' : '#fff' }}>
+                              {suggestion.name}
+                            </h3>
+                            {suggestion.recommended && !isDisabled && (
+                              <span style={{
+                                padding: '2px 8px',
+                                background: '#0abfbc',
+                                color: '#000',
+                                fontSize: 11,
+                                fontWeight: 700,
+                                borderRadius: 4,
+                                textTransform: 'uppercase',
+                                letterSpacing: '0.5px'
+                              }}>
+                                Recommended
+                              </span>
+                            )}
+                          </div>
+                          <p style={{ margin: '0 0 12px 0', color: isDisabled ? '#71717a' : '#9ca3af', fontSize: 14 }}>
+                            {suggestion.description}
+                          </p>
+                          {isDisabled ? (
+                            <p style={{ margin: 0, color: '#ef4444', fontSize: 13, fontWeight: 500 }}>
+                              ⚠️ {disabledReason}
+                            </p>
+                          ) : (
+                            <p style={{ margin: 0, color: '#0abfbc', fontSize: 13, fontWeight: 500 }}>
+                              📊 {suggestion.total_matches} total matches
+                            </p>
                           )}
                         </div>
-                        <p style={{ margin: '0 0 12px 0', color: '#9ca3af', fontSize: 14 }}>
-                          {suggestion.description}
-                        </p>
-                        <p style={{ margin: 0, color: '#0abfbc', fontSize: 13, fontWeight: 500 }}>
-                          📊 {suggestion.total_matches} total matches
-                        </p>
-                      </div>
-                      <div style={{
-                        width: 24,
-                        height: 24,
-                        borderRadius: '50%',
-                        border: `2px solid ${selectedFormat === suggestion.format ? '#0abfbc' : '#6b7280'}`,
-                        background: selectedFormat === suggestion.format ? '#0abfbc' : 'transparent',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        flexShrink: 0,
-                        marginLeft: 16,
-                      }}>
-                        {selectedFormat === suggestion.format && (
-                          <span style={{ color: '#000', fontSize: 14, fontWeight: 900 }}>✓</span>
+                        {!isDisabled && (
+                          <div style={{
+                            width: 24,
+                            height: 24,
+                            borderRadius: '50%',
+                            border: `2px solid ${selectedFormat === suggestion.format ? '#0abfbc' : '#6b7280'}`,
+                            background: selectedFormat === suggestion.format ? '#0abfbc' : 'transparent',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            flexShrink: 0,
+                            marginLeft: 16,
+                          }}>
+                            {selectedFormat === suggestion.format && (
+                              <span style={{ color: '#000', fontSize: 14, fontWeight: 900 }}>✓</span>
+                            )}
+                          </div>
                         )}
                       </div>
-                    </div>
 
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-                      <div>
-                        <p style={{ margin: '0 0 6px 0', fontSize: 12, fontWeight: 600, color: '#10b981', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                          Pros
-                        </p>
-                        <ul style={{ margin: 0, paddingLeft: 20, color: '#d4d4d8', fontSize: 13, lineHeight: 1.8 }}>
-                          {suggestion.pros.map((pro: string, i: number) => (
-                            <li key={i}>{pro}</li>
-                          ))}
-                        </ul>
-                      </div>
-                      <div>
-                        <p style={{ margin: '0 0 6px 0', fontSize: 12, fontWeight: 600, color: '#ef4444', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                          Cons
-                        </p>
-                        <ul style={{ margin: 0, paddingLeft: 20, color: '#d4d4d8', fontSize: 13, lineHeight: 1.8 }}>
-                          {suggestion.cons.map((con: string, i: number) => (
-                            <li key={i}>{con}</li>
-                          ))}
-                        </ul>
-                      </div>
+                      {!isDisabled && (
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+                          <div>
+                            <p style={{ margin: '0 0 6px 0', fontSize: 12, fontWeight: 600, color: '#10b981', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                              Pros
+                            </p>
+                            <ul style={{ margin: 0, paddingLeft: 20, color: '#d4d4d8', fontSize: 13, lineHeight: 1.8 }}>
+                              {suggestion.pros.map((pro: string, i: number) => (
+                                <li key={i}>{pro}</li>
+                              ))}
+                            </ul>
+                          </div>
+                          <div>
+                            <p style={{ margin: '0 0 6px 0', fontSize: 12, fontWeight: 600, color: '#ef4444', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                              Cons
+                            </p>
+                            <ul style={{ margin: 0, paddingLeft: 20, color: '#d4d4d8', fontSize: 13, lineHeight: 1.8 }}>
+                              {suggestion.cons.map((con: string, i: number) => (
+                                <li key={i}>{con}</li>
+                              ))}
+                            </ul>
+                          </div>
+                        </div>
+                      )}
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
 
               {selectedFormat && (
