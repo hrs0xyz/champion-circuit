@@ -1218,18 +1218,39 @@ def staff_generate_bracket_route(
             raise HTTPException(status_code=500, detail=error_msg)
     
     elif format_choice in ["knockout", "page_playoff", "swiss"]:
+        print(f"🏆 Entering knockout generation block")
         # These all use knockout bracket generation
         try:
+            print(f"   Current status: {t.status}")
+            
+            # Allow generation for any reasonable status
+            if t.status not in ["registration", "live", "draft", "pending_approval"]:
+                print(f"   ❌ Cannot generate for status '{t.status}'")
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Cannot generate bracket for tournament in '{t.status}' status"
+                )
+            
+            # Update status if needed
+            if t.status != "registration":
+                print(f"   Updating status from '{t.status}' to 'registration'")
+                t.status = "registration"
+                db.commit()
+                db.refresh(t)
+            
             t.format = "knockout"
             t.format_type = "knockout"
             db.commit()
             
+            print(f"   Calling generate_bracket for knockout format...")
             generate_bracket(
                 db, t.id, current_user.id,
                 (payload.round_stage_map if payload else None) or None,
             )
+            print(f"   ✅ Knockout bracket generated successfully")
             return serialize_bracket(t, db)
         except ValueError as e:
+            print(f"   ❌ ValueError: {str(e)}")
             raise HTTPException(status_code=400, detail=str(e))
     
     else:
