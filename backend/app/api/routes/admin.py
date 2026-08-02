@@ -1162,6 +1162,8 @@ def staff_generate_bracket_route(
                 logger.info(f"   Tournament status is '{t.status}', updating to 'registration'")
                 t.status = "registration"
                 db.commit()
+                db.refresh(t)  # Refresh to ensure updated status is seen
+                logger.info(f"   Status updated to: {t.status}")
             
             # Set format FIRST (before calling generate_groups which checks format)
             logger.info(f"   Setting format to round_robin...")
