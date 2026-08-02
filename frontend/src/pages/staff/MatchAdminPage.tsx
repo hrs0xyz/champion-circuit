@@ -773,6 +773,9 @@ function TournamentManagement({ tournament, onUpdate, onMsg }: {
   const [assigning, setAssigning] = useState(false);
   const [assignUsername, setAssignUsername] = useState('');
   const [editing, setEditing] = useState(false);
+  const [showAdmins, setShowAdmins] = useState(false);
+  const [admins, setAdmins] = useState<Array<{ user_id: number; username: string; name: string }>>([]);
+  const [loadingAdmins, setLoadingAdmins] = useState(false);
   const [editForm, setEditForm] = useState({
     name: tournament.name,
     min_participants: tournament.min_participants,
@@ -834,8 +837,42 @@ function TournamentManagement({ tournament, onUpdate, onMsg }: {
       onMsg(`Assigned @${assignUsername} as match admin`, 'success');
       setAssigning(false);
       setAssignUsername('');
+      if (showAdmins) {
+        await loadAdmins();
+      }
     } catch (e) {
       onMsg(e instanceof ApiError ? e.message : 'Failed to assign match admin', 'error');
+    }
+  }
+
+  async function loadAdmins() {
+    setLoadingAdmins(true);
+    try {
+      const data = await ccApi.listTournamentAdmins(tournament.id);
+      setAdmins(data);
+    } catch (e) {
+      onMsg(e instanceof ApiError ? e.message : 'Failed to load admins', 'error');
+    } finally {
+      setLoadingAdmins(false);
+    }
+  }
+
+  async function removeAdmin(userId: number, username: string) {
+    if (!window.confirm(`Remove @${username} as match admin?`)) return;
+    try {
+      await ccApi.removeMatchAdmin(tournament.id, userId);
+      onMsg(`Removed @${username} as match admin`, 'success');
+      await loadAdmins();
+    } catch (e) {
+      onMsg(e instanceof ApiError ? e.message : 'Failed to remove match admin', 'error');
+    }
+  }
+
+  async function toggleAdminsList() {
+    const newState = !showAdmins;
+    setShowAdmins(newState);
+    if (newState) {
+      await loadAdmins();
     }
   }
 
@@ -913,6 +950,13 @@ function TournamentManagement({ tournament, onUpdate, onMsg }: {
             onClick={() => setAssigning(!assigning)}
           >
             {assigning ? 'Cancel' : 'Assign match admin'}
+          </button>
+          <button
+            type="button"
+            className="btn btn-secondary btn-sm"
+            onClick={() => void toggleAdminsList()}
+          >
+            {showAdmins ? 'Hide admins' : '👥 View match admins'}
           </button>
           {tournament.status !== 'completed' && tournament.status !== 'cancelled' && (
             <button
@@ -1058,6 +1102,46 @@ function TournamentManagement({ tournament, onUpdate, onMsg }: {
             <button type="button" className="btn btn-ghost btn-sm" onClick={() => setAssigning(false)}>
               Cancel
             </button>
+          </div>
+        )}
+
+        {showAdmins && (
+          <div className="staff-card" style={{ marginTop: 16, background: '#0a0f1a' }}>
+            <h4 className="staff-h3" style={{ marginBottom: 16 }}>Match Admins</h4>
+            {loadingAdmins ? (
+              <p className="muted">Loading...</p>
+            ) : admins.length === 0 ? (
+              <p className="muted">No match admins assigned yet.</p>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {admins.map((admin) => (
+                  <div
+                    key={admin.user_id}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      padding: 12,
+                      background: '#121824',
+                      borderRadius: 8,
+                    }}
+                  >
+                    <div>
+                      <p style={{ fontWeight: 500 }}>{admin.name}</p>
+                      <p className="muted small">@{admin.username}</p>
+                    </div>
+                    <button
+                      type="button"
+                      className="btn btn-ghost btn-sm"
+                      style={{ color: '#ef4444' }}
+                      onClick={() => void removeAdmin(admin.user_id, admin.username)}
+                    >
+                      Remove
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
       </div>

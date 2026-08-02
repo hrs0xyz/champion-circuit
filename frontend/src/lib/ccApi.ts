@@ -343,6 +343,12 @@ export const ccApi = {
     req<{ message: string }>(`/api/admin/tournaments/${tournamentId}/assign-match-admin`, {
       method: 'POST', body: JSON.stringify({ username }),
     }),
+  listTournamentAdmins: (tournamentId: number) =>
+    req<Array<{ user_id: number; username: string; name: string }>>(`/api/admin/tournaments/${tournamentId}/admins`),
+  removeMatchAdmin: (tournamentId: number, userId: number) =>
+    req<{ message: string }>(`/api/admin/tournaments/${tournamentId}/assign-match-admin/${userId}`, {
+      method: 'DELETE',
+    }),
 
   // Bookings
   book: (payload: object) =>
