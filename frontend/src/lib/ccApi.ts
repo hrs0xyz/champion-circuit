@@ -443,8 +443,27 @@ export const ccApi = {
   deleteStage: (stageId: number) =>
     req<{ message: string }>(`/api/admin/stages/${stageId}`, { method: 'DELETE' }),
   generateBracket: (tournamentId: number, roundStageMap: Record<number, number> = {}) =>
-    req<BracketData>(`/api/admin/tournaments/${tournamentId}/generate-bracket`, {
+    req<BracketData>(`/api/staff/tournaments/${tournamentId}/generate-bracket`, {
       method: 'POST', body: JSON.stringify({ round_stage_map: roundStageMap }),
+    }),
+  getFormatSuggestions: (tournamentId: number) =>
+    req<{
+      tournament_id: number;
+      checked_in_count: number;
+      suggestions: Array<{
+        format: string;
+        name: string;
+        description: string;
+        total_matches: number;
+        recommended: boolean;
+        pros: string[];
+        cons: string[];
+        config?: Record<string, any>;
+      }>;
+    }>(`/api/staff/tournaments/${tournamentId}/format-suggestions`),
+  regenerateBracket: (tournamentId: number, payload: { format?: string; round_stage_map?: Record<number, number> }) =>
+    req<{ message: string }>(`/api/staff/tournaments/${tournamentId}/regenerate-bracket`, {
+      method: 'POST', body: JSON.stringify(payload),
     }),
   blockTournamentSlots: (tournamentId: number) =>
     req<{ blocked: SlotBlockRow[]; conflicts: SlotBlockRow[] }>(

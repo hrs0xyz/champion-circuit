@@ -474,6 +474,52 @@ def delete_stage(
     return {"message": "Stage deleted"}
 
 
+@router.post("/admin/tournaments/{tournament_id}/regenerate-bracket")
+def regenerate_bracket(
+    tournament_id: int,
+    payload: GenerateBracketPayload,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Delete existing bracket and regenerate with new format."""
+    t = require_tournament_manage_access(db, current_user, tournament_id)
+    
+    # Delete all existing matches for this tournament
+    existing_matches = db.query(Match).filter(Match.tournament_id == tournament_id).all()
+    for match in existing_matches:
+        # Delete match participants
+        db.query(MatchParticipant).filter(MatchParticipant.match_id == match.id).delete()
+        db.delete(match)
+    
+    # Delete all teams
+    db.query(Team).filter(Team.tournament_id == tournament_id).delete()
+    
+    # Clear tournament format if switching
+    if payload.format:
+        t.format = payload.format
+    
+    db.commit()
+    
+    # Generate new bracket
+    try:
+        generate_bracket(db, t, payload)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    
+    return {"message": "Bracket regenerated successfully"}
+
+
+@router.post("/staff/tournaments/{tournament_id}/regenerate-bracket")
+def staff_regenerate_bracket(
+    tournament_id: int,
+    payload: GenerateBracketPayload,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Staff version of regenerate bracket."""
+    return regenerate_bracket(tournament_id, payload, current_user, db)
+
+
 @router.post("/admin/tournaments/{tournament_id}/generate-bracket")
 def generate_bracket_route(
     tournament_id: int,
@@ -906,6 +952,98 @@ def _user_summary(u: User) -> dict:
         "created_at": u.created_at,
     }
 
+
+
+# ── Bracket Format Suggestions ────────────────────────────────────────────────
+
+@router.get("/admin/tournaments/{tournament_id}/format-suggestions")
+def get_format_suggestions(
+    tournament_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Suggest best tournament formats based on participant count."""
+    t = require_tournament_manage_access(db, current_user, tournament_id)
+    
+    # Count checked-in participants
+    checked_in = db.query(TournamentRegistration).filter(
+        TournamentRegistration.tournament_id == tournament_id,
+        TournamentRegistration.checked_in == True
+    ).count()
+    
+    suggestions = []
+    
+    # Single elimination (knockout)
+    knockout_rounds = 0
+    temp = checked_in
+    while temp > 1:
+        temp = (temp + 1) // 2
+        knockout_rounds += 1
+    
+    suggestions.append({
+        "format": "knockout",
+        "name": "Single Elimination (Knockout)",
+        "description": f"{knockout_rounds} rounds, winner advances",
+        "total_matches": checked_in - 1 if checked_in > 0 else 0,
+        "recommended": checked_in >= 8 and checked_in <= 32,
+        "pros": ["Fast", "Every match matters", "Clear winner"],
+        "cons": ["Players eliminated after 1 loss", "No second chances"],
+    })
+    
+    # Group stage + knockout
+    if checked_in >= 8:
+        num_groups = 2 if checked_in < 16 else 4
+        per_group = checked_in // num_groups
+        group_matches = num_groups * (per_group * (per_group - 1)) // 2
+        knockout_players = num_groups * 2  # Top 2 from each group
+        knockout_matches = knockout_players - 1
+        
+        suggestions.append({
+            "format": "group_knockout",
+            "name": f"Group Stage ({num_groups} groups) + Knockout",
+            "description": f"{num_groups} groups of ~{per_group}, top 2 advance to knockout",
+            "total_matches": group_matches + knockout_matches,
+            "recommended": checked_in >= 12 and checked_in <= 64,
+            "pros": ["Everyone plays multiple matches", "Fair seeding for knockout", "Exciting finals"],
+            "cons": ["More matches", "Takes longer"],
+            "config": {
+                "num_groups": num_groups,
+                "per_group": per_group,
+                "advance_from_group": 2
+            }
+        })
+    
+    # Round robin (everyone plays everyone)
+    if checked_in >= 3 and checked_in <= 12:
+        rr_matches = (checked_in * (checked_in - 1)) // 2
+        suggestions.append({
+            "format": "round_robin",
+            "name": "Round Robin (League)",
+            "description": "Everyone plays everyone once",
+            "total_matches": rr_matches,
+            "recommended": checked_in >= 4 and checked_in <= 8,
+            "pros": ["Most fair", "Everyone plays everyone", "True ranking"],
+            "cons": ["Many matches", "Can be long"],
+        })
+    
+    # Sort by recommended
+    suggestions.sort(key=lambda x: x.get("recommended", False), reverse=True)
+    
+    return {
+        "tournament_id": tournament_id,
+        "checked_in_count": checked_in,
+        "suggestions": suggestions
+    }
+
+
+@router.get("/staff/tournaments/{tournament_id}/format-suggestions")
+def staff_get_format_suggestions(
+    tournament_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Staff version of format suggestions."""
+    return get_format_suggestions(tournament_id, current_user, db)
 
 
 # ── Group Stage Routes ────────────────────────────────────────────────────────

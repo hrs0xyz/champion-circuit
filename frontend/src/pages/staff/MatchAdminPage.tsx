@@ -55,6 +55,9 @@ export function MatchAdminPage() {
   const [selectedUsers, setSelectedUsers] = useState<number[]>([]);
   const [showScanner, setShowScanner] = useState(false);
   const [scanError, setScanError] = useState('');
+  const [showBracketDialog, setShowBracketDialog] = useState(false);
+  const [formatSuggestions, setFormatSuggestions] = useState<any>(null);
+  const [selectedFormat, setSelectedFormat] = useState<string>('');
 
   useEffect(() => {
     if (!user) { navigate('/match-admin-login', { replace: true }); return; }
