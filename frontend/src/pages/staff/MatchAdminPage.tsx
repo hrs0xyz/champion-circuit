@@ -898,7 +898,7 @@ function TournamentManagement({ tournament, onUpdate, onMsg }: {
         payload.mode = editForm.mode;
         payload.min_participants = editForm.min_participants;
         payload.max_participants = editForm.max_participants;
-        payload.entry_fee_paise = editForm.entry_fee_paise;
+        payload.entry_fee_paise = 0; // Always FREE - paid tournaments not supported yet
         payload.prize_pool_inr = editForm.prize_pool_inr;
         payload.prize_description = editForm.prize_description;
         payload.registration_deadline = editForm.registration_deadline;
@@ -1132,11 +1132,14 @@ function TournamentManagement({ tournament, onUpdate, onMsg }: {
                     <input
                       type="number"
                       className="auth-input"
-                      value={editForm.entry_fee_paise / 100}
-                      onChange={(e) => setEditForm({ ...editForm, entry_fee_paise: Math.round(Number(e.target.value) * 100) })}
+                      value={0}
+                      disabled
                       min={0}
                       step={1}
                     />
+                    <p className="muted small" style={{ marginTop: 4, color: '#f59e0b' }}>
+                      ⚠️ Paid entry not supported yet - all tournaments must be FREE
+                    </p>
                   </div>
                   <div className="auth-field">
                     <label className="auth-label">Prize Pool (₹)</label>
