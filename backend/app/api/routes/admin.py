@@ -973,7 +973,34 @@ def get_format_suggestions(
     
     suggestions = []
     
-    # Single elimination (knockout)
+    if checked_in < 3:
+        return {
+            "tournament_id": tournament_id,
+            "checked_in_count": checked_in,
+            "suggestions": [{
+                "format": "not_enough",
+                "name": "Not Enough Participants",
+                "description": "Need at least 3 checked-in participants to generate a bracket",
+                "total_matches": 0,
+                "recommended": False,
+                "pros": [],
+                "cons": ["Not enough players"],
+            }]
+        }
+    
+    # Round robin (everyone plays everyone) - works for any count
+    rr_matches = (checked_in * (checked_in - 1)) // 2
+    suggestions.append({
+        "format": "round_robin",
+        "name": "Round Robin (League)",
+        "description": "Everyone plays everyone once",
+        "total_matches": rr_matches,
+        "recommended": checked_in >= 3 and checked_in <= 8,
+        "pros": ["Most fair", "Everyone plays everyone", "True ranking", "No eliminations"],
+        "cons": ["Many matches", "Can be long"] if checked_in > 6 else ["Takes time"],
+    })
+    
+    # Single elimination (knockout) - works for any count (with byes)
     knockout_rounds = 0
     temp = checked_in
     while temp > 1:
@@ -986,26 +1013,59 @@ def get_format_suggestions(
         "description": f"{knockout_rounds} rounds, winner advances",
         "total_matches": checked_in - 1 if checked_in > 0 else 0,
         "recommended": checked_in >= 8 and checked_in <= 32,
-        "pros": ["Fast", "Every match matters", "Clear winner"],
+        "pros": ["Fast", "Every match matters", "Clear winner", "Exciting"],
         "cons": ["Players eliminated after 1 loss", "No second chances"],
     })
     
-    # Group stage + knockout
+    # Qualification + Knockout (for 5+ players)
+    if checked_in >= 5:
+        # Qualification round: everyone plays 1-2 matches
+        # Top 4 advance to semi-finals
+        qual_matches = checked_in // 2  # Pair up players
+        knockout_matches = 3  # Semi 1, Semi 2, Final
+        total = qual_matches + knockout_matches
+        
+        suggestions.append({
+            "format": "qualification_knockout",
+            "name": "Qualification Round + Knockout",
+            "description": f"All {checked_in} play qualification matches, top 4 advance to semi-finals + final",
+            "total_matches": total,
+            "recommended": checked_in >= 5 and checked_in <= 12,
+            "pros": ["Everyone gets to play", "Best players reach finals", "Balanced duration", "Fair seeding"],
+            "cons": ["Some players play only 1 match", "Requires match scheduling"],
+        })
+    
+    # Double Elimination (for 6+ players)
+    if checked_in >= 6:
+        # Winners bracket + Losers bracket
+        de_matches = (checked_in - 1) * 2 - 1  # Approximate
+        suggestions.append({
+            "format": "double_elimination",
+            "name": "Double Elimination",
+            "description": "Lose twice to be eliminated - winners & losers bracket",
+            "total_matches": de_matches,
+            "recommended": checked_in >= 8 and checked_in <= 24,
+            "pros": ["Second chances", "More matches per player", "Fairer than single elimination"],
+            "cons": ["Complex bracket", "Takes longer", "Can be confusing"],
+        })
+    
+    # Group stage + knockout (for 8+ players)
     if checked_in >= 8:
         num_groups = 2 if checked_in < 16 else 4
         per_group = checked_in // num_groups
         group_matches = num_groups * (per_group * (per_group - 1)) // 2
         knockout_players = num_groups * 2  # Top 2 from each group
         knockout_matches = knockout_players - 1
+        total = group_matches + knockout_matches
         
         suggestions.append({
             "format": "group_knockout",
             "name": f"Group Stage ({num_groups} groups) + Knockout",
             "description": f"{num_groups} groups of ~{per_group}, top 2 advance to knockout",
-            "total_matches": group_matches + knockout_matches,
+            "total_matches": total,
             "recommended": checked_in >= 12 and checked_in <= 64,
-            "pros": ["Everyone plays multiple matches", "Fair seeding for knockout", "Exciting finals"],
-            "cons": ["More matches", "Takes longer"],
+            "pros": ["Everyone plays multiple matches", "Fair seeding for knockout", "Exciting finals", "Like World Cup"],
+            "cons": ["More matches", "Takes longer", "Requires scheduling"],
             "config": {
                 "num_groups": num_groups,
                 "per_group": per_group,
@@ -1013,21 +1073,22 @@ def get_format_suggestions(
             }
         })
     
-    # Round robin (everyone plays everyone)
-    if checked_in >= 3 and checked_in <= 12:
-        rr_matches = (checked_in * (checked_in - 1)) // 2
+    # Swiss System (for 8+ players) - good for many participants
+    if checked_in >= 8:
+        swiss_rounds = min(5, checked_in // 2)  # Typically 4-5 rounds
+        swiss_matches = checked_in * swiss_rounds // 2
         suggestions.append({
-            "format": "round_robin",
-            "name": "Round Robin (League)",
-            "description": "Everyone plays everyone once",
-            "total_matches": rr_matches,
-            "recommended": checked_in >= 4 and checked_in <= 8,
-            "pros": ["Most fair", "Everyone plays everyone", "True ranking"],
-            "cons": ["Many matches", "Can be long"],
+            "format": "swiss",
+            "name": f"Swiss System ({swiss_rounds} rounds)",
+            "description": "Players paired by similar records, no elimination",
+            "total_matches": swiss_matches,
+            "recommended": checked_in >= 16 and checked_in <= 128,
+            "pros": ["No elimination", "Everyone plays same number", "Efficient", "Fair pairing"],
+            "cons": ["Requires live pairing", "Complex to organize", "Not yet implemented"],
         })
     
-    # Sort by recommended
-    suggestions.sort(key=lambda x: x.get("recommended", False), reverse=True)
+    # Sort by recommended, then by match count
+    suggestions.sort(key=lambda x: (not x.get("recommended", False), x.get("total_matches", 999)))
     
     return {
         "tournament_id": tournament_id,
