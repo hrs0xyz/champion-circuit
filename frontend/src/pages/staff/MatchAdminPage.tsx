@@ -889,27 +889,27 @@ function TournamentManagement({ tournament, onUpdate, onMsg }: {
 
   async function saveSettings() {
     try {
-      const payload: any = {
-        description: editForm.description,
-        rules: editForm.rules,
-        prize_pool_inr: editForm.prize_pool_inr,
-        prize_description: editForm.prize_description,
-      };
+      const payload: any = {};
       
-      // Only allow editing these fields in draft mode
       if (isDraft) {
+        // Draft mode: send all editable fields
         payload.name = editForm.name;
         payload.game = editForm.game;
         payload.mode = editForm.mode;
         payload.min_participants = editForm.min_participants;
         payload.max_participants = editForm.max_participants;
         payload.entry_fee_paise = editForm.entry_fee_paise;
+        payload.prize_pool_inr = editForm.prize_pool_inr;
+        payload.prize_description = editForm.prize_description;
         payload.registration_deadline = editForm.registration_deadline;
         payload.starts_at = editForm.starts_at;
         payload.ends_at = editForm.ends_at;
         payload.banner_url = editForm.banner_url;
+        payload.description = editForm.description;
+        payload.rules = editForm.rules;
       } else {
-        // In live mode, only allow min/max participants adjustments
+        // Live mode: ONLY min/max participants for match admins
+        // Backend will reject anything else for non-super-admins
         payload.min_participants = editForm.min_participants;
         payload.max_participants = editForm.max_participants;
       }
@@ -1040,7 +1040,7 @@ function TournamentManagement({ tournament, onUpdate, onMsg }: {
               {!isDraft && <span className="muted small" style={{ marginLeft: 8 }}>(Limited - Tournament is live)</span>}
             </h4>
             
-            {isDraft && (
+            {isDraft ? (
               <>
                 <div className="auth-field" style={{ marginBottom: 16 }}>
                   <label className="auth-label">Tournament Name</label>
@@ -1149,94 +1149,98 @@ function TournamentManagement({ tournament, onUpdate, onMsg }: {
                     />
                   </div>
                 </div>
+
+                <div className="auth-field" style={{ marginBottom: 16 }}>
+                  <label className="auth-label">Prize Description</label>
+                  <input
+                    type="text"
+                    className="auth-input"
+                    value={editForm.prize_description}
+                    onChange={(e) => setEditForm({ ...editForm, prize_description: e.target.value })}
+                    placeholder="e.g., Trophies for top 3, Gift cards"
+                  />
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
+                  <div className="auth-field">
+                    <label className="auth-label">Minimum Participants</label>
+                    <input
+                      type="number"
+                      className="auth-input"
+                      value={editForm.min_participants}
+                      onChange={(e) => setEditForm({ ...editForm, min_participants: Number(e.target.value) })}
+                      min={0}
+                    />
+                    <p className="muted small" style={{ marginTop: 4 }}>
+                      Set to 0 to disable minimum requirement
+                    </p>
+                  </div>
+                  <div className="auth-field">
+                    <label className="auth-label">Maximum Participants</label>
+                    <input
+                      type="number"
+                      className="auth-input"
+                      value={editForm.max_participants}
+                      onChange={(e) => setEditForm({ ...editForm, max_participants: Number(e.target.value) })}
+                      min={2}
+                    />
+                  </div>
+                </div>
+
+                <div className="auth-field" style={{ marginBottom: 16 }}>
+                  <label className="auth-label">Description</label>
+                  <textarea
+                    className="auth-input"
+                    value={editForm.description}
+                    onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
+                    rows={4}
+                    placeholder="Tell players what to expect from this tournament..."
+                  />
+                </div>
+
+                <div className="auth-field" style={{ marginBottom: 16 }}>
+                  <label className="auth-label">Rules</label>
+                  <textarea
+                    className="auth-input"
+                    value={editForm.rules}
+                    onChange={(e) => setEditForm({ ...editForm, rules: e.target.value })}
+                    rows={4}
+                    placeholder="Tournament rules, format, scoring system..."
+                  />
+                </div>
               </>
-            )}
-
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
-              <div className="auth-field">
-                <label className="auth-label">Minimum Participants</label>
-                <input
-                  type="number"
-                  className="auth-input"
-                  value={editForm.min_participants}
-                  onChange={(e) => setEditForm({ ...editForm, min_participants: Number(e.target.value) })}
-                  min={0}
-                />
-                <p className="muted small" style={{ marginTop: 4 }}>
-                  Set to 0 to disable minimum requirement
+            ) : (
+              <>
+                <p className="muted small" style={{ marginBottom: 16 }}>
+                  ⚠️ Live tournaments have limited edit options to prevent disrupting participants.
+                  Only participant capacity can be adjusted.
                 </p>
-              </div>
-              <div className="auth-field">
-                <label className="auth-label">Maximum Participants</label>
-                <input
-                  type="number"
-                  className="auth-input"
-                  value={editForm.max_participants}
-                  onChange={(e) => setEditForm({ ...editForm, max_participants: Number(e.target.value) })}
-                  min={2}
-                />
-              </div>
-            </div>
-
-            {isDraft && (
-              <div className="auth-field" style={{ marginBottom: 16 }}>
-                <label className="auth-label">Prize Description</label>
-                <input
-                  type="text"
-                  className="auth-input"
-                  value={editForm.prize_description}
-                  onChange={(e) => setEditForm({ ...editForm, prize_description: e.target.value })}
-                  placeholder="e.g., Trophies for top 3, Gift cards"
-                />
-              </div>
-            )}
-
-            <div className="auth-field" style={{ marginBottom: 16 }}>
-              <label className="auth-label">Description</label>
-              <textarea
-                className="auth-input"
-                value={editForm.description}
-                onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
-                rows={4}
-                placeholder="Tell players what to expect from this tournament..."
-              />
-            </div>
-
-            <div className="auth-field" style={{ marginBottom: 16 }}>
-              <label className="auth-label">Rules</label>
-              <textarea
-                className="auth-input"
-                value={editForm.rules}
-                onChange={(e) => setEditForm({ ...editForm, rules: e.target.value })}
-                rows={4}
-                placeholder="Tournament rules, format, scoring system..."
-              />
-            </div>
-
-            {!isDraft && (
-              <div className="auth-field" style={{ marginBottom: 16 }}>
-                <label className="auth-label">Prize Pool (₹)</label>
-                <input
-                  type="number"
-                  className="auth-input"
-                  value={editForm.prize_pool_inr}
-                  onChange={(e) => setEditForm({ ...editForm, prize_pool_inr: Number(e.target.value) })}
-                  min={0}
-                />
-              </div>
-            )}
-
-            {!isDraft && (
-              <div className="auth-field" style={{ marginBottom: 16 }}>
-                <label className="auth-label">Prize Description</label>
-                <input
-                  type="text"
-                  className="auth-input"
-                  value={editForm.prize_description}
-                  onChange={(e) => setEditForm({ ...editForm, prize_description: e.target.value })}
-                  placeholder="e.g., Trophies for top 3, Gift cards"
-                />
-              </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
+                  <div className="auth-field">
+                    <label className="auth-label">Minimum Participants</label>
+                    <input
+                      type="number"
+                      className="auth-input"
+                      value={editForm.min_participants}
+                      onChange={(e) => setEditForm({ ...editForm, min_participants: Number(e.target.value) })}
+                      min={0}
+                    />
+                    <p className="muted small" style={{ marginTop: 4 }}>
+                      Set to 0 to disable minimum requirement
+                    </p>
+                  </div>
+                  <div className="auth-field">
+                    <label className="auth-label">Maximum Participants</label>
+                    <input
+                      type="number"
+                      className="auth-input"
+                      value={editForm.max_participants}
+                      onChange={(e) => setEditForm({ ...editForm, max_participants: Number(e.target.value) })}
+                      min={2}
+                    />
+                  </div>
+                </div>
+              </>
             )}
 
             <div style={{ display: 'flex', gap: 12, marginTop: 16 }}>
