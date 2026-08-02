@@ -1106,6 +1106,29 @@ def staff_get_format_suggestions(
     return get_format_suggestions(tournament_id, current_user, db)
 
 
+@router.post("/staff/tournaments/{tournament_id}/generate-bracket")
+def staff_generate_bracket_route(
+    tournament_id: int,
+    payload: GenerateBracketPayload | None = None,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Staff version of generate bracket."""
+    if not is_tournament_admin(db, current_user, tournament_id):
+        raise HTTPException(status_code=403, detail="Not assigned to this tournament")
+    t = db.get(Tournament, tournament_id)
+    if not t:
+        raise HTTPException(status_code=404, detail="Tournament not found")
+    try:
+        generate_bracket(
+            db, t.id, current_user.id,
+            (payload.round_stage_map if payload else None) or None,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    return serialize_bracket(t, db)
+
+
 # ── Group Stage Routes ────────────────────────────────────────────────────────
 
 from pydantic import BaseModel
