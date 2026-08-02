@@ -198,6 +198,8 @@ class GenerateBracketPayload(BaseModel):
     # round_number → stage_id; unmapped rounds fall back to proportional
     # distribution across the tournament's stages (in stage_order).
     round_stage_map: dict[int, int] = Field(default_factory=dict)
+    # Optional format override for regeneration
+    format: str | None = Field(default=None)
 
 
 class WalkoverPayload(BaseModel):
