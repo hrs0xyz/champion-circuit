@@ -5,7 +5,7 @@
  * schedule bracket matches, verify results (auto-advances the bracket) and
  * resolve no-shows with walkovers.
  */
-import { useEffect, useState, type FormEvent } from 'react';
+import { useEffect, useState, useRef, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { ccApi, type Match, type StaffParticipant, type Tournament } from '../../lib/ccApi';
@@ -776,8 +776,16 @@ function TournamentManagement({ tournament, onUpdate, onMsg }: {
   const [showAdmins, setShowAdmins] = useState(false);
   const [admins, setAdmins] = useState<Array<{ user_id: number; username: string; name: string }>>([]);
   const [loadingAdmins, setLoadingAdmins] = useState(false);
+  const [uploadingBanner, setUploadingBanner] = useState(false);
+  const bannerInputRef = useRef<HTMLInputElement>(null);
+  
+  // Draft = everything editable, Live = only specific fields
+  const isDraft = tournament.status === 'draft' || tournament.status === 'pending_approval';
+  
   const [editForm, setEditForm] = useState({
     name: tournament.name,
+    game: tournament.game,
+    mode: tournament.mode,
     min_participants: tournament.min_participants,
     max_participants: tournament.max_participants,
     prize_pool_inr: tournament.prize_pool_inr || 0,
@@ -786,6 +794,9 @@ function TournamentManagement({ tournament, onUpdate, onMsg }: {
     description: tournament.description || '',
     rules: tournament.rules || '',
     registration_deadline: tournament.registration_deadline || '',
+    starts_at: tournament.starts_at || '',
+    ends_at: tournament.ends_at || '',
+    banner_url: tournament.banner_url || '',
   });
 
   async function toggleRegistration() {
@@ -878,22 +889,75 @@ function TournamentManagement({ tournament, onUpdate, onMsg }: {
 
   async function saveSettings() {
     try {
-      await ccApi.updateTournament(tournament.id, {
-        name: editForm.name,
-        min_participants: editForm.min_participants,
-        max_participants: editForm.max_participants,
-        prize_pool_inr: editForm.prize_pool_inr,
-        prize_description: editForm.prize_description,
-        entry_fee_paise: editForm.entry_fee_paise,
+      const payload: any = {
         description: editForm.description,
         rules: editForm.rules,
-        registration_deadline: editForm.registration_deadline,
-      });
+        prize_pool_inr: editForm.prize_pool_inr,
+        prize_description: editForm.prize_description,
+      };
+      
+      // Only allow editing these fields in draft mode
+      if (isDraft) {
+        payload.name = editForm.name;
+        payload.game = editForm.game;
+        payload.mode = editForm.mode;
+        payload.min_participants = editForm.min_participants;
+        payload.max_participants = editForm.max_participants;
+        payload.entry_fee_paise = editForm.entry_fee_paise;
+        payload.registration_deadline = editForm.registration_deadline;
+        payload.starts_at = editForm.starts_at;
+        payload.ends_at = editForm.ends_at;
+        payload.banner_url = editForm.banner_url;
+      } else {
+        // In live mode, only allow min/max participants adjustments
+        payload.min_participants = editForm.min_participants;
+        payload.max_participants = editForm.max_participants;
+      }
+      
+      await ccApi.updateTournament(tournament.id, payload);
       onMsg('Tournament settings updated.', 'success');
       setEditing(false);
       onUpdate();
     } catch (e) {
       onMsg(e instanceof ApiError ? e.message : 'Failed to update tournament', 'error');
+    }
+  }
+
+  async function handleBannerUpload(file: File) {
+    if (!file.type.match(/^image\/(jpeg|png|webp)$/)) {
+      onMsg('Please upload a JPG, PNG, or WebP image', 'error');
+      return;
+    }
+    if (file.size > 3 * 1024 * 1024) {
+      onMsg('Image must be 3MB or smaller', 'error');
+      return;
+    }
+
+    setUploadingBanner(true);
+    try {
+      const token = localStorage.getItem('cc_token');
+      const formData = new FormData();
+      formData.append('file', file);
+      
+      const response = await fetch(`${BASE}/api/uploads/tournament-banner`, {
+        method: 'POST',
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const body = await response.json().catch(() => ({}));
+        throw new Error(body.detail ?? 'Upload failed');
+      }
+
+      const result = await response.json() as { url: string };
+      setEditForm({ ...editForm, banner_url: result.url });
+      onMsg('Banner uploaded successfully', 'success');
+    } catch (err) {
+      onMsg(err instanceof Error ? err.message : 'Upload failed', 'error');
+    } finally {
+      setUploadingBanner(false);
+      if (bannerInputRef.current) bannerInputRef.current.value = '';
     }
   }
 
@@ -971,17 +1035,122 @@ function TournamentManagement({ tournament, onUpdate, onMsg }: {
 
         {editing && (
           <div className="staff-card" style={{ marginTop: 16, background: '#0a0f1a' }}>
-            <h4 className="staff-h3" style={{ marginBottom: 16 }}>Edit Tournament Settings</h4>
+            <h4 className="staff-h3" style={{ marginBottom: 16 }}>
+              Edit Tournament Settings
+              {!isDraft && <span className="muted small" style={{ marginLeft: 8 }}>(Limited - Tournament is live)</span>}
+            </h4>
             
-            <div className="auth-field" style={{ marginBottom: 16 }}>
-              <label className="auth-label">Tournament Name</label>
-              <input
-                type="text"
-                className="auth-input"
-                value={editForm.name}
-                onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
-              />
-            </div>
+            {isDraft && (
+              <>
+                <div className="auth-field" style={{ marginBottom: 16 }}>
+                  <label className="auth-label">Tournament Name</label>
+                  <input
+                    type="text"
+                    className="auth-input"
+                    value={editForm.name}
+                    onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
+                  />
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
+                  <div className="auth-field">
+                    <label className="auth-label">Game</label>
+                    <input
+                      type="text"
+                      className="auth-input"
+                      value={editForm.game}
+                      onChange={(e) => setEditForm({ ...editForm, game: e.target.value })}
+                    />
+                  </div>
+                  <div className="auth-field">
+                    <label className="auth-label">Mode</label>
+                    <select
+                      className="auth-input"
+                      value={editForm.mode}
+                      onChange={(e) => setEditForm({ ...editForm, mode: e.target.value })}
+                    >
+                      <option value="solo">Solo</option>
+                      <option value="duo">Duo</option>
+                      <option value="squad">Squad</option>
+                      <option value="team">Team</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="auth-field" style={{ marginBottom: 16 }}>
+                  <label className="auth-label">Banner Image</label>
+                  {editForm.banner_url && (
+                    <div style={{ marginBottom: 8 }}>
+                      <img src={editForm.banner_url} alt="Banner" style={{ maxWidth: '100%', maxHeight: 200, borderRadius: 8 }} />
+                    </div>
+                  )}
+                  <input
+                    ref={bannerInputRef}
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp"
+                    onChange={(e) => e.target.files?.[0] && handleBannerUpload(e.target.files[0])}
+                    style={{ display: 'block', marginBottom: 4 }}
+                  />
+                  {uploadingBanner && <p className="muted small">Uploading...</p>}
+                  <p className="muted small">Recommended: 1200x400px, JPG/PNG/WebP, max 3MB</p>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
+                  <div className="auth-field">
+                    <label className="auth-label">Starts At</label>
+                    <input
+                      type="datetime-local"
+                      className="auth-input"
+                      value={editForm.starts_at ? new Date(editForm.starts_at).toISOString().slice(0, 16) : ''}
+                      onChange={(e) => setEditForm({ ...editForm, starts_at: e.target.value ? new Date(e.target.value).toISOString() : '' })}
+                    />
+                  </div>
+                  <div className="auth-field">
+                    <label className="auth-label">Ends At</label>
+                    <input
+                      type="datetime-local"
+                      className="auth-input"
+                      value={editForm.ends_at ? new Date(editForm.ends_at).toISOString().slice(0, 16) : ''}
+                      onChange={(e) => setEditForm({ ...editForm, ends_at: e.target.value ? new Date(e.target.value).toISOString() : '' })}
+                    />
+                  </div>
+                </div>
+
+                <div className="auth-field" style={{ marginBottom: 16 }}>
+                  <label className="auth-label">Registration Deadline</label>
+                  <input
+                    type="datetime-local"
+                    className="auth-input"
+                    value={editForm.registration_deadline ? new Date(editForm.registration_deadline).toISOString().slice(0, 16) : ''}
+                    onChange={(e) => setEditForm({ ...editForm, registration_deadline: e.target.value ? new Date(e.target.value).toISOString() : '' })}
+                  />
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
+                  <div className="auth-field">
+                    <label className="auth-label">Entry Fee (₹)</label>
+                    <input
+                      type="number"
+                      className="auth-input"
+                      value={editForm.entry_fee_paise / 100}
+                      onChange={(e) => setEditForm({ ...editForm, entry_fee_paise: Math.round(Number(e.target.value) * 100) })}
+                      min={0}
+                      step={1}
+                    />
+                  </div>
+                  <div className="auth-field">
+                    <label className="auth-label">Prize Pool (₹)</label>
+                    <input
+                      type="number"
+                      className="auth-input"
+                      value={editForm.prize_pool_inr}
+                      onChange={(e) => setEditForm({ ...editForm, prize_pool_inr: Number(e.target.value) })}
+                      min={0}
+                    />
+                  </div>
+                </div>
+              </>
+            )}
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
               <div className="auth-field">
@@ -1009,50 +1178,18 @@ function TournamentManagement({ tournament, onUpdate, onMsg }: {
               </div>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
-              <div className="auth-field">
-                <label className="auth-label">Entry Fee (₹)</label>
+            {isDraft && (
+              <div className="auth-field" style={{ marginBottom: 16 }}>
+                <label className="auth-label">Prize Description</label>
                 <input
-                  type="number"
+                  type="text"
                   className="auth-input"
-                  value={editForm.entry_fee_paise / 100}
-                  onChange={(e) => setEditForm({ ...editForm, entry_fee_paise: Math.round(Number(e.target.value) * 100) })}
-                  min={0}
-                  step={1}
+                  value={editForm.prize_description}
+                  onChange={(e) => setEditForm({ ...editForm, prize_description: e.target.value })}
+                  placeholder="e.g., Trophies for top 3, Gift cards"
                 />
               </div>
-              <div className="auth-field">
-                <label className="auth-label">Prize Pool (₹)</label>
-                <input
-                  type="number"
-                  className="auth-input"
-                  value={editForm.prize_pool_inr}
-                  onChange={(e) => setEditForm({ ...editForm, prize_pool_inr: Number(e.target.value) })}
-                  min={0}
-                />
-              </div>
-            </div>
-
-            <div className="auth-field" style={{ marginBottom: 16 }}>
-              <label className="auth-label">Prize Description</label>
-              <input
-                type="text"
-                className="auth-input"
-                value={editForm.prize_description}
-                onChange={(e) => setEditForm({ ...editForm, prize_description: e.target.value })}
-                placeholder="e.g., Trophies for top 3, Gift cards"
-              />
-            </div>
-
-            <div className="auth-field" style={{ marginBottom: 16 }}>
-              <label className="auth-label">Registration Deadline</label>
-              <input
-                type="datetime-local"
-                className="auth-input"
-                value={editForm.registration_deadline ? new Date(editForm.registration_deadline).toISOString().slice(0, 16) : ''}
-                onChange={(e) => setEditForm({ ...editForm, registration_deadline: e.target.value ? new Date(e.target.value).toISOString() : '' })}
-              />
-            </div>
+            )}
 
             <div className="auth-field" style={{ marginBottom: 16 }}>
               <label className="auth-label">Description</label>
@@ -1075,6 +1212,32 @@ function TournamentManagement({ tournament, onUpdate, onMsg }: {
                 placeholder="Tournament rules, format, scoring system..."
               />
             </div>
+
+            {!isDraft && (
+              <div className="auth-field" style={{ marginBottom: 16 }}>
+                <label className="auth-label">Prize Pool (₹)</label>
+                <input
+                  type="number"
+                  className="auth-input"
+                  value={editForm.prize_pool_inr}
+                  onChange={(e) => setEditForm({ ...editForm, prize_pool_inr: Number(e.target.value) })}
+                  min={0}
+                />
+              </div>
+            )}
+
+            {!isDraft && (
+              <div className="auth-field" style={{ marginBottom: 16 }}>
+                <label className="auth-label">Prize Description</label>
+                <input
+                  type="text"
+                  className="auth-input"
+                  value={editForm.prize_description}
+                  onChange={(e) => setEditForm({ ...editForm, prize_description: e.target.value })}
+                  placeholder="e.g., Trophies for top 3, Gift cards"
+                />
+              </div>
+            )}
 
             <div style={{ display: 'flex', gap: 12, marginTop: 16 }}>
               <button type="button" className="btn btn-primary btn-sm" onClick={() => void saveSettings()}>
