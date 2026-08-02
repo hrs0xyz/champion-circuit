@@ -988,51 +988,53 @@ def get_format_suggestions(
             }]
         }
     
-    # Round robin (everyone plays everyone) - works for any count
+    # Round robin (everyone plays everyone) - works for any count, MOST FAIR
     rr_matches = (checked_in * (checked_in - 1)) // 2
     suggestions.append({
         "format": "round_robin",
         "name": "Round Robin (League)",
-        "description": "Everyone plays everyone once",
+        "description": "Everyone plays everyone once - most fair format",
         "total_matches": rr_matches,
-        "recommended": checked_in >= 3 and checked_in <= 8,
-        "pros": ["Most fair", "Everyone plays everyone", "True ranking", "No eliminations"],
-        "cons": ["Many matches", "Can be long"] if checked_in > 6 else ["Takes time"],
+        "recommended": checked_in >= 3 and checked_in <= 10,
+        "pros": ["Most fair", "Everyone plays everyone", "True ranking", "No eliminations", "Best format for small groups"],
+        "cons": ["Many matches" if checked_in > 6 else "Takes time", "No dramatic finals"],
     })
     
-    # Single elimination (knockout) - works for any count (with byes)
+    # Single elimination (knockout) - works for any count (with byes for odd numbers)
     knockout_rounds = 0
     temp = checked_in
     while temp > 1:
         temp = (temp + 1) // 2
         knockout_rounds += 1
     
+    has_byes = checked_in != 2 ** int(checked_in).bit_length() - 1
+    bye_note = " (some players get byes in round 1)" if has_byes else ""
+    
     suggestions.append({
         "format": "knockout",
         "name": "Single Elimination (Knockout)",
-        "description": f"{knockout_rounds} rounds, winner advances",
+        "description": f"{knockout_rounds} rounds, winner advances{bye_note}",
         "total_matches": checked_in - 1 if checked_in > 0 else 0,
         "recommended": checked_in >= 8 and checked_in <= 32,
-        "pros": ["Fast", "Every match matters", "Clear winner", "Exciting"],
-        "cons": ["Players eliminated after 1 loss", "No second chances"],
+        "pros": ["Fast", "Every match matters", "Clear winner", "Exciting", "Quick tournament"],
+        "cons": ["Players eliminated after 1 loss", "No second chances", "Unequal match counts with byes"],
     })
     
-    # Qualification + Knockout (for 5+ players)
-    if checked_in >= 5:
-        # Qualification round: everyone plays 1-2 matches
-        # Top 4 advance to semi-finals
-        qual_matches = checked_in // 2  # Pair up players
-        knockout_matches = 3  # Semi 1, Semi 2, Final
-        total = qual_matches + knockout_matches
-        
+    # Page Playoff System (for exactly 4-6 players) - FAIR and EFFICIENT
+    if checked_in >= 4 and checked_in <= 6:
+        # Page System: Top 4 after qualification/seeding
+        # Match 1: Seed 1 vs Seed 2 (winner to final)
+        # Match 2: Seed 3 vs Seed 4 (loser eliminated)
+        # Match 3: Loser of Match 1 vs Winner of Match 2
+        # Match 4: Final
         suggestions.append({
-            "format": "qualification_knockout",
-            "name": "Qualification Round + Knockout",
-            "description": f"All {checked_in} play qualification matches, top 4 advance to semi-finals + final",
-            "total_matches": total,
-            "recommended": checked_in >= 5 and checked_in <= 12,
-            "pros": ["Everyone gets to play", "Best players reach finals", "Balanced duration", "Fair seeding"],
-            "cons": ["Some players play only 1 match", "Requires match scheduling"],
+            "format": "page_playoff",
+            "name": f"Page Playoff System",
+            "description": "Top seeds get advantage: 1v2 winner goes to final, 3v4 loser eliminated, others compete for final spot",
+            "total_matches": 4 if checked_in == 4 else (rr_matches // 2 + 4),
+            "recommended": checked_in >= 4 and checked_in <= 6,
+            "pros": ["Fair with seeding advantage", "Everyone plays 2-3 matches", "Efficient", "Rewards top seeds"],
+            "cons": ["Requires proper seeding", "Complex for participants to understand"],
         })
     
     # Double Elimination (for 6+ players)
