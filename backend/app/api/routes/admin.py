@@ -1157,6 +1157,12 @@ def staff_generate_bracket_route(
                 ).update({"payment_status": "paid"})
                 db.commit()
             
+            # Update tournament status to registration if needed (for draft/pending tournaments)
+            if t.status != "registration":
+                logger.info(f"   Tournament status is '{t.status}', updating to 'registration'")
+                t.status = "registration"
+                db.commit()
+            
             # Set format FIRST (before calling generate_groups which checks format)
             logger.info(f"   Setting format to round_robin...")
             t.format = "round_robin"
