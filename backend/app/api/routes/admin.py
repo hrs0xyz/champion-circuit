@@ -1114,34 +1114,39 @@ def staff_generate_bracket_route(
     db: Session = Depends(get_db),
 ):
     """Staff version of generate bracket - supports multiple formats."""
-    import logging
-    logger = logging.getLogger(__name__)
     
-    logger.info(f"📥 GENERATE BRACKET REQUEST: tournament_id={tournament_id}, payload={payload}")
+    print(f"\n{'='*80}")
+    print(f"📥 GENERATE BRACKET REQUEST")
+    print(f"   Tournament ID: {tournament_id}")
+    print(f"   Payload: {payload}")
+    print(f"   User: {current_user.id} ({current_user.username})")
+    print(f"{'='*80}\n")
     
     if not is_tournament_admin(db, current_user, tournament_id):
-        logger.error(f"❌ User {current_user.id} is not tournament admin for tournament {tournament_id}")
+        print(f"❌ User {current_user.id} is not tournament admin for tournament {tournament_id}")
         raise HTTPException(status_code=403, detail="Not assigned to this tournament")
+    
     t = db.get(Tournament, tournament_id)
     if not t:
-        logger.error(f"❌ Tournament {tournament_id} not found")
+        print(f"❌ Tournament {tournament_id} not found")
         raise HTTPException(status_code=404, detail="Tournament not found")
     
     format_choice = payload.format if payload else "knockout"
-    logger.info(f"📊 Format choice: {format_choice}, payload type: {type(payload)}")
+    print(f"📊 Format choice: '{format_choice}'")
+    print(f"   Payload object: {payload}")
+    print(f"   Payload.format: {payload.format if payload else 'None'}")
+    print(f"   Tournament status: {t.status}")
+    print(f"   Tournament format: {t.format}")
+    print(f"   Tournament format_type: {t.format_type}\n")
     
     # Different formats use different generation functions
     if format_choice == "round_robin":
+        print(f"🎯 Entering round_robin generation block")
         # Round robin: everyone plays everyone using group generation
         from app.services.groups import generate_groups
-        import logging
-        logger = logging.getLogger(__name__)
         
         try:
-            logger.info(f"🎯 Starting round_robin generation for tournament {tournament_id}")
-            logger.info(f"   Entry fee: {t.entry_fee_paise} paise")
-            logger.info(f"   Current format: {t.format}, format_type: {t.format_type}")
-            logger.info(f"   Status: {t.status}")
+            print(f"   Entry fee: {t.entry_fee_paise} paise")
             
             # For free tournaments, auto-mark all registrations as paid
             if t.entry_fee_paise == 0:
@@ -1149,7 +1154,7 @@ def staff_generate_bracket_route(
                     TournamentRegistration.tournament_id == tournament_id,
                     TournamentRegistration.payment_status == "unpaid"
                 ).count()
-                logger.info(f"   Free tournament - marking {unpaid} unpaid registrations as paid")
+                print(f"   Free tournament - marking {unpaid} unpaid registrations as paid")
                 
                 db.query(TournamentRegistration).filter(
                     TournamentRegistration.tournament_id == tournament_id,
@@ -1159,33 +1164,33 @@ def staff_generate_bracket_route(
             
             # Update tournament status to registration if needed (for draft/pending tournaments)
             if t.status != "registration":
-                logger.info(f"   Tournament status is '{t.status}', updating to 'registration'")
+                print(f"   Tournament status is '{t.status}', updating to 'registration'")
                 t.status = "registration"
                 db.commit()
                 db.refresh(t)  # Refresh to ensure updated status is seen
-                logger.info(f"   Status updated to: {t.status}")
+                print(f"   Status updated to: {t.status}")
             
             # Set format FIRST (before calling generate_groups which checks format)
-            logger.info(f"   Setting format to round_robin...")
+            print(f"   Setting format to round_robin...")
             t.format = "round_robin"
             t.format_type = "round_robin"
             db.commit()
             db.refresh(t)  # Refresh to get updated format
-            logger.info(f"   Format updated: {t.format}, format_type: {t.format_type}")
+            print(f"   Format updated: format={t.format}, format_type={t.format_type}")
             
             # Count paid participants (generate_groups uses payment_status)
             paid_count = db.query(TournamentRegistration).filter(
                 TournamentRegistration.tournament_id == tournament_id,
                 TournamentRegistration.payment_status == "paid"
             ).count()
-            logger.info(f"   Found {paid_count} paid participants")
+            print(f"   Found {paid_count} paid participants")
             
             if paid_count < 2:
                 error_msg = f"Need at least 2 paid participants to generate bracket (found {paid_count})"
-                logger.error(f"   ❌ {error_msg}")
+                print(f"   ❌ {error_msg}")
                 raise HTTPException(status_code=400, detail=error_msg)
             
-            logger.info(f"   Calling generate_groups with num_groups=1, advance_per_group={paid_count}")
+            print(f"   Calling generate_groups with num_groups=1, advance_per_group={paid_count}")
             groups, total_matches = generate_groups(
                 db, t,
                 num_groups=1,  # Single group = everyone plays everyone
@@ -1194,7 +1199,7 @@ def staff_generate_bracket_route(
                 points_draw=1,
                 points_loss=0,
             )
-            logger.info(f"   ✅ Success! Generated {len(groups)} groups with {total_matches} matches")
+            print(f"   ✅ Success! Generated {len(groups)} groups with {total_matches} matches\n")
             
             return {
                 "message": f"Round robin generated with {total_matches} matches",
@@ -1203,11 +1208,13 @@ def staff_generate_bracket_route(
             }
         except ValueError as e:
             error_msg = str(e)
-            logger.error(f"   ❌ ValueError: {error_msg}")
+            print(f"   ❌ ValueError: {error_msg}\n")
             raise HTTPException(status_code=400, detail=error_msg)
         except Exception as e:
             error_msg = f"Unexpected error: {str(e)}"
-            logger.error(f"   ❌ {error_msg}", exc_info=True)
+            print(f"   ❌ Exception: {error_msg}\n")
+            import traceback
+            traceback.print_exc()
             raise HTTPException(status_code=500, detail=error_msg)
     
     elif format_choice in ["knockout", "page_playoff", "swiss"]:
