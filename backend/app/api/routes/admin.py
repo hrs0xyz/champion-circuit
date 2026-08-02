@@ -1127,6 +1127,14 @@ def staff_generate_bracket_route(
         # Round robin: everyone plays everyone using group generation
         from app.services.groups import generate_groups
         try:
+            # For free tournaments, auto-mark all registrations as paid
+            if t.entry_fee_paise == 0:
+                db.query(TournamentRegistration).filter(
+                    TournamentRegistration.tournament_id == tournament_id,
+                    TournamentRegistration.payment_status == "unpaid"
+                ).update({"payment_status": "paid"})
+                db.commit()
+            
             # Set format FIRST (before calling generate_groups which checks format)
             t.format = "round_robin"
             t.format_type = "round_robin"
@@ -1138,6 +1146,12 @@ def staff_generate_bracket_route(
                 TournamentRegistration.tournament_id == tournament_id,
                 TournamentRegistration.payment_status == "paid"
             ).count()
+            
+            if paid_count < 2:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Need at least 2 paid participants to generate bracket (found {paid_count})"
+                )
             
             groups, total_matches = generate_groups(
                 db, t,
