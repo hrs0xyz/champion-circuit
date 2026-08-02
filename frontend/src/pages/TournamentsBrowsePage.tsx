@@ -167,11 +167,21 @@ export function TournamentsBrowsePage() {
             <div className="tournament-grid">
               {visible.map((t) => (
                 <Link key={t.id} to={`/tournaments/${t.slug}`} className="tournament-card-new trn-card-link">
-                  {t.banner_url ? (
-                    <div className="tournament-card-new__banner">
+                  <div className="tournament-card-new__banner" style={{
+                    background: t.banner_url ? 'transparent' : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}>
+                    {t.banner_url ? (
                       <img src={t.banner_url} alt={t.name} />
-                    </div>
-                  ) : null}
+                    ) : (
+                      <div style={{ textAlign: 'center', padding: '32px 16px', color: 'white' }}>
+                        <div style={{ fontSize: '48px', marginBottom: '8px' }}>🏆</div>
+                        <div style={{ fontSize: '14px', fontWeight: 600 }}>{t.game.toUpperCase()}</div>
+                      </div>
+                    )}
+                  </div>
 
                   <div className="tournament-card-new__body">
                     <div className="tournament-card-new__header">
