@@ -442,9 +442,9 @@ export const ccApi = {
     }),
   deleteStage: (stageId: number) =>
     req<{ message: string }>(`/api/admin/stages/${stageId}`, { method: 'DELETE' }),
-  generateBracket: (tournamentId: number, roundStageMap: Record<number, number> = {}) =>
+  generateBracket: (tournamentId: number, payload: { format?: string; round_stage_map?: Record<number, number> } = {}) =>
     req<BracketData>(`/api/staff/tournaments/${tournamentId}/generate-bracket`, {
-      method: 'POST', body: JSON.stringify({ round_stage_map: roundStageMap }),
+      method: 'POST', body: JSON.stringify(payload),
     }),
   getFormatSuggestions: (tournamentId: number) =>
     req<{

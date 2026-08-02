@@ -162,8 +162,8 @@ export function MatchAdminPage() {
         await ccApi.regenerateBracket(selected.id, { format: selectedFormat });
         setMsg('Bracket regenerated successfully!');
       } else {
-        // First time generation
-        await ccApi.generateBracket(selected.id, {});
+        // First time generation - pass the selected format
+        await ccApi.generateBracket(selected.id, { format: selectedFormat });
         setMsg('Bracket generated successfully!');
       }
       
