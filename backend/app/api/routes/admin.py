@@ -1126,9 +1126,23 @@ def staff_generate_bracket_route(
     if format_choice == "round_robin":
         # Round robin: everyone plays everyone using group generation
         from app.services.groups import generate_groups
+        import logging
+        logger = logging.getLogger(__name__)
+        
         try:
+            logger.info(f"🎯 Starting round_robin generation for tournament {tournament_id}")
+            logger.info(f"   Entry fee: {t.entry_fee_paise} paise")
+            logger.info(f"   Current format: {t.format}, format_type: {t.format_type}")
+            logger.info(f"   Status: {t.status}")
+            
             # For free tournaments, auto-mark all registrations as paid
             if t.entry_fee_paise == 0:
+                unpaid = db.query(TournamentRegistration).filter(
+                    TournamentRegistration.tournament_id == tournament_id,
+                    TournamentRegistration.payment_status == "unpaid"
+                ).count()
+                logger.info(f"   Free tournament - marking {unpaid} unpaid registrations as paid")
+                
                 db.query(TournamentRegistration).filter(
                     TournamentRegistration.tournament_id == tournament_id,
                     TournamentRegistration.payment_status == "unpaid"
@@ -1136,23 +1150,26 @@ def staff_generate_bracket_route(
                 db.commit()
             
             # Set format FIRST (before calling generate_groups which checks format)
+            logger.info(f"   Setting format to round_robin...")
             t.format = "round_robin"
             t.format_type = "round_robin"
             db.commit()
             db.refresh(t)  # Refresh to get updated format
+            logger.info(f"   Format updated: {t.format}, format_type: {t.format_type}")
             
             # Count paid participants (generate_groups uses payment_status)
             paid_count = db.query(TournamentRegistration).filter(
                 TournamentRegistration.tournament_id == tournament_id,
                 TournamentRegistration.payment_status == "paid"
             ).count()
+            logger.info(f"   Found {paid_count} paid participants")
             
             if paid_count < 2:
-                raise HTTPException(
-                    status_code=400,
-                    detail=f"Need at least 2 paid participants to generate bracket (found {paid_count})"
-                )
+                error_msg = f"Need at least 2 paid participants to generate bracket (found {paid_count})"
+                logger.error(f"   ❌ {error_msg}")
+                raise HTTPException(status_code=400, detail=error_msg)
             
+            logger.info(f"   Calling generate_groups with num_groups=1, advance_per_group={paid_count}")
             groups, total_matches = generate_groups(
                 db, t,
                 num_groups=1,  # Single group = everyone plays everyone
@@ -1161,13 +1178,21 @@ def staff_generate_bracket_route(
                 points_draw=1,
                 points_loss=0,
             )
+            logger.info(f"   ✅ Success! Generated {len(groups)} groups with {total_matches} matches")
+            
             return {
                 "message": f"Round robin generated with {total_matches} matches",
                 "format": "round_robin",
                 "total_matches": total_matches,
             }
         except ValueError as e:
-            raise HTTPException(status_code=400, detail=str(e))
+            error_msg = str(e)
+            logger.error(f"   ❌ ValueError: {error_msg}")
+            raise HTTPException(status_code=400, detail=error_msg)
+        except Exception as e:
+            error_msg = f"Unexpected error: {str(e)}"
+            logger.error(f"   ❌ {error_msg}", exc_info=True)
+            raise HTTPException(status_code=500, detail=error_msg)
     
     elif format_choice in ["knockout", "page_playoff", "swiss"]:
         # These all use knockout bracket generation
