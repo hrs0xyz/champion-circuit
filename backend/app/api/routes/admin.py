@@ -1110,8 +1110,9 @@ def get_format_suggestions(
             "pros": ["Fair with seeding advantage", "Everyone plays 2-3 matches", "Efficient", "Rewards top seeds"],
             "cons": ["Requires proper seeding", "Complex for participants to understand"],
         })
-    elif checked_in >= 5 and checked_in <= 6:
-        # Show as unavailable for 5-6 players
+    elif checked_in < 4:
+        # Show as unavailable - need more players
+        need_more = 4 - checked_in
         suggestions.append({
             "format": "page_playoff",
             "name": "Page Playoff System",
@@ -1119,7 +1120,19 @@ def get_format_suggestions(
             "total_matches": 0,  # Mark as unavailable
             "recommended": False,
             "pros": [],
-            "cons": ["Requires exactly 4 participants"],
+            "cons": [f"Need {need_more} more participant{'s' if need_more > 1 else ''} (requires exactly 4)"],
+        })
+    elif checked_in > 4 and checked_in <= 6:
+        # Show as unavailable - too many players
+        too_many = checked_in - 4
+        suggestions.append({
+            "format": "page_playoff",
+            "name": "Page Playoff System",
+            "description": "Works best with exactly 4 participants",
+            "total_matches": 0,  # Mark as unavailable
+            "recommended": False,
+            "pros": [],
+            "cons": [f"Have {too_many} too many participant{'s' if too_many > 1 else ''} (requires exactly 4)"],
         })
     
     # Double Elimination (for 6+ players)
