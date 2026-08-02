@@ -375,6 +375,14 @@ def update_tournament(
 ):
     t = require_tournament_manage_access(db, current_user, tournament_id)
     data = payload.model_dump(exclude_unset=True)
+    
+    # Debug logging
+    print(f"🔍 UPDATE TOURNAMENT {tournament_id}")
+    print(f"   Status: {t.status}")
+    print(f"   User is_admin: {current_user.is_admin}")
+    print(f"   Payload keys: {list(data.keys())}")
+    print(f"   Payload data: {data}")
+    
     if data.get("entry_fee_paise"):
         # Free entry at launch — the payment flow (Razorpay order/confirm)
         # is not wired yet, and a paid tournament would be unrunnable.
