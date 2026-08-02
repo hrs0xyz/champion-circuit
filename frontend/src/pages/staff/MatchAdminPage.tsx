@@ -59,6 +59,8 @@ export function MatchAdminPage() {
   const [formatSuggestions, setFormatSuggestions] = useState<any>(null);
   const [selectedFormat, setSelectedFormat] = useState<string>('');
   const [busy, setBusy] = useState(false);
+  const [showAdvanced, setShowAdvanced] = useState(false);
+  const [participantSeeds, setParticipantSeeds] = useState<Array<{user_id: number; username: string; seed: number}>>([]);
 
   useEffect(() => {
     if (!user) { navigate('/match-admin-login', { replace: true }); return; }
@@ -133,7 +135,17 @@ export function MatchAdminPage() {
         setSelectedFormat(recommended.format);
       }
       
+      // Prepare participant seeding list (checked-in only)
+      const checkedIn = participants.filter(p => p.checked_in_at);
+      const seeds = checkedIn.map((p, index) => ({
+        user_id: p.user_id,
+        username: p.username,
+        seed: index + 1, // Default sequential seeding
+      }));
+      setParticipantSeeds(seeds);
+      
       setShowBracketDialog(true);
+      setShowAdvanced(false);
     } catch (e) {
       setMsg(e instanceof ApiError ? e.message : 'Failed to load format suggestions');
     }
@@ -534,6 +546,211 @@ export function MatchAdminPage() {
                       {formatSuggestions.suggestions.find((s: any) => s.format === selectedFormat)?.name}
                     </strong>
                   </p>
+                </div>
+              )}
+
+              {/* Advanced Options Toggle */}
+              {selectedFormat && (
+                <div style={{ marginTop: 16 }}>
+                  <button
+                    type="button"
+                    className="btn btn-ghost btn-sm"
+                    onClick={() => setShowAdvanced(!showAdvanced)}
+                    style={{ width: '100%' }}
+                  >
+                    {showAdvanced ? '▼ Hide Advanced Options' : '▶ Show Advanced Options (Seeding & Preview)'}
+                  </button>
+                </div>
+              )}
+
+              {/* Advanced Seeding Interface */}
+              {showAdvanced && selectedFormat && (
+                <div style={{ marginTop: 16, padding: 20, background: '#0d1117', border: '1px solid #2a3544', borderRadius: 8 }}>
+                  <h4 style={{ margin: '0 0 12px 0', fontSize: 16, fontWeight: 600, color: '#fff' }}>
+                    🎯 Manual Seeding
+                  </h4>
+                  <p style={{ margin: '0 0 16px 0', color: '#9ca3af', fontSize: 13 }}>
+                    Adjust the seeding order for participants. Higher seeds (1, 2, 3...) get favorable bracket positions.
+                  </p>
+
+                  {/* Seeding Controls */}
+                  <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+                    <button
+                      type="button"
+                      className="btn btn-secondary btn-sm"
+                      onClick={() => {
+                        // Reset to default sequential order
+                        const sorted = [...participantSeeds].map((p, i) => ({ ...p, seed: i + 1 }));
+                        setParticipantSeeds(sorted);
+                      }}
+                    >
+                      ↻ Reset Order
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-secondary btn-sm"
+                      onClick={() => {
+                        // Randomize seeds
+                        const shuffled = [...participantSeeds]
+                          .sort(() => Math.random() - 0.5)
+                          .map((p, i) => ({ ...p, seed: i + 1 }));
+                        setParticipantSeeds(shuffled);
+                      }}
+                    >
+                      🎲 Randomize
+                    </button>
+                  </div>
+
+                  {/* Participant List with Seeding */}
+                  <div style={{ maxHeight: 400, overflowY: 'auto', border: '1px solid #2a3544', borderRadius: 8 }}>
+                    <table className="staff-table" style={{ marginBottom: 0 }}>
+                      <thead>
+                        <tr>
+                          <th style={{ width: 80 }}>Seed</th>
+                          <th>Username</th>
+                          <th style={{ width: 120 }}>Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {[...participantSeeds].sort((a, b) => a.seed - b.seed).map((p, index) => (
+                          <tr key={p.user_id}>
+                            <td>
+                              <input
+                                type="number"
+                                min="1"
+                                max={participantSeeds.length}
+                                value={p.seed}
+                                onChange={(e) => {
+                                  const newSeed = parseInt(e.target.value) || 1;
+                                  const updated = participantSeeds.map(participant => {
+                                    if (participant.user_id === p.user_id) {
+                                      return { ...participant, seed: newSeed };
+                                    }
+                                    return participant;
+                                  });
+                                  setParticipantSeeds(updated);
+                                }}
+                                style={{
+                                  width: '60px',
+                                  padding: '4px 8px',
+                                  background: '#1a1f2e',
+                                  border: '1px solid #2d3748',
+                                  borderRadius: '4px',
+                                  color: 'white',
+                                  fontSize: '14px',
+                                }}
+                              />
+                            </td>
+                            <td>@{p.username}</td>
+                            <td>
+                              <div style={{ display: 'flex', gap: 4 }}>
+                                <button
+                                  type="button"
+                                  className="btn btn-ghost btn-sm"
+                                  disabled={index === 0}
+                                  onClick={() => {
+                                    // Move up
+                                    const sorted = [...participantSeeds].sort((a, b) => a.seed - b.seed);
+                                    if (index > 0) {
+                                      const temp = sorted[index].seed;
+                                      sorted[index].seed = sorted[index - 1].seed;
+                                      sorted[index - 1].seed = temp;
+                                      setParticipantSeeds(sorted);
+                                    }
+                                  }}
+                                  style={{ padding: '2px 8px', fontSize: '12px' }}
+                                >
+                                  ▲
+                                </button>
+                                <button
+                                  type="button"
+                                  className="btn btn-ghost btn-sm"
+                                  disabled={index === participantSeeds.length - 1}
+                                  onClick={() => {
+                                    // Move down
+                                    const sorted = [...participantSeeds].sort((a, b) => a.seed - b.seed);
+                                    if (index < sorted.length - 1) {
+                                      const temp = sorted[index].seed;
+                                      sorted[index].seed = sorted[index + 1].seed;
+                                      sorted[index + 1].seed = temp;
+                                      setParticipantSeeds(sorted);
+                                    }
+                                  }}
+                                  style={{ padding: '2px 8px', fontSize: '12px' }}
+                                >
+                                  ▼
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {/* Bracket Preview */}
+                  <div style={{ marginTop: 20 }}>
+                    <h4 style={{ margin: '0 0 12px 0', fontSize: 16, fontWeight: 600, color: '#fff' }}>
+                      👁️ Bracket Preview
+                    </h4>
+                    <div style={{ padding: 16, background: '#1a1f2e', border: '1px solid #2a3544', borderRadius: 8 }}>
+                      {selectedFormat === 'knockout' && (
+                        <div>
+                          <p style={{ margin: '0 0 12px 0', color: '#0abfbc', fontSize: 14, fontWeight: 500 }}>
+                            Single Elimination Bracket
+                          </p>
+                          <div style={{ display: 'grid', gap: 8, fontSize: 13, color: '#d4d4d8' }}>
+                            {(() => {
+                              const sorted = [...participantSeeds].sort((a, b) => a.seed - b.seed);
+                              const rounds = Math.ceil(Math.log2(sorted.length));
+                              return (
+                                <div>
+                                  <p style={{ marginBottom: 8, color: '#9ca3af' }}>
+                                    <strong>Round 1 Matchups:</strong>
+                                  </p>
+                                  {sorted.slice(0, Math.min(4, sorted.length)).map((p, i) => {
+                                    if (i % 2 === 0 && i + 1 < sorted.length) {
+                                      return (
+                                        <div key={i} style={{ padding: '8px', background: '#0d1117', borderRadius: '4px', marginBottom: '4px' }}>
+                                          Seed #{p.seed} @{p.username} <strong>vs</strong> Seed #{sorted[i + 1].seed} @{sorted[i + 1].username}
+                                        </div>
+                                      );
+                                    }
+                                    return null;
+                                  })}
+                                  {sorted.length > 4 && (
+                                    <p style={{ marginTop: 8, color: '#6b7280', fontSize: 12 }}>
+                                      ... and {Math.floor(sorted.length / 2) - 2} more matches
+                                    </p>
+                                  )}
+                                </div>
+                              );
+                            })()}
+                          </div>
+                        </div>
+                      )}
+                      {selectedFormat === 'group_knockout' && (
+                        <div>
+                          <p style={{ margin: '0 0 12px 0', color: '#0abfbc', fontSize: 14, fontWeight: 500 }}>
+                            Group Stage + Knockout
+                          </p>
+                          <p style={{ margin: 0, color: '#9ca3af', fontSize: 13 }}>
+                            Groups will be created with balanced seeding. Top performers advance to knockout rounds.
+                          </p>
+                        </div>
+                      )}
+                      {selectedFormat === 'round_robin' && (
+                        <div>
+                          <p style={{ margin: '0 0 12px 0', color: '#0abfbc', fontSize: 14, fontWeight: 500 }}>
+                            Round Robin Format
+                          </p>
+                          <p style={{ margin: 0, color: '#9ca3af', fontSize: 13 }}>
+                            Everyone plays everyone once. {(participantSeeds.length * (participantSeeds.length - 1)) / 2} total matches.
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
                 </div>
               )}
             </div>
