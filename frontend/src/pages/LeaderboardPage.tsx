@@ -35,16 +35,34 @@ export function LeaderboardPage() {
   const [period, setPeriod] = useState<'all_time' | 'monthly' | 'weekly'>('all_time');
   const [rows, setRows] = useState<LeaderboardRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [tournaments, setTournaments] = useState<Array<{ id: number; name: string }>>([]);
+  const [selectedTournament, setSelectedTournament] = useState<number | null>(null);
+  const [tournamentSearch, setTournamentSearch] = useState('');
+
+  // Load tournaments for filter
+  useEffect(() => {
+    ccApi.tournaments({ status_filter: '', limit: 100 })
+      .then((response) => {
+        setTournaments(response.items.map(t => ({ id: t.id, name: t.name })));
+      })
+      .catch(() => setTournaments([]));
+  }, []);
 
   useEffect(() => {
     setLoading(true);
-    const scopeType = cities.length === 1 ? 'city' : 'global';
-    const scopeId = cities.length === 1 ? cities[0] : '';
+    const scopeType = selectedTournament ? 'tournament' : (cities.length === 1 ? 'city' : 'global');
+    const scopeId = selectedTournament ? String(selectedTournament) : (cities.length === 1 ? cities[0] : '');
     ccApi.leaderboard({ scope_type: scopeType, scope_id: scopeId, period_type: period, limit: 100 })
       .then(setRows)
       .catch(() => setRows([]))
       .finally(() => setLoading(false));
-  }, [cities, period]);
+  }, [cities, period, selectedTournament]);
+
+  // Fuzzy search tournaments
+  const filteredTournaments = tournaments.filter((t) => {
+    if (!tournamentSearch) return true;
+    return t.name.toLowerCase().includes(tournamentSearch.toLowerCase());
+  });
 
   // Client-side sport filter (we don't have sport breakdown from backend yet)
   // The backend will support this when tournament.game is wired to leaderboard
@@ -59,9 +77,74 @@ export function LeaderboardPage() {
         <div className="section-head" style={{ marginTop: 24 }}>
           <h1>Leaderboard</h1>
           <p>
-            {cities.length > 0 ? `Rankings in ${cities.join(', ')}` : 'Global rankings'}
+            {selectedTournament 
+              ? `Tournament rankings: ${tournaments.find(t => t.id === selectedTournament)?.name || 'Loading...'}`
+              : cities.length > 0 
+                ? `Rankings in ${cities.join(', ')}` 
+                : 'Global rankings'}
             {sport !== 'All' ? <> · <strong>{sport}</strong></> : null}.
           </p>
+        </div>
+
+        {/* Tournament filter */}
+        <div style={{ marginBottom: 16 }}>
+          <label htmlFor="tournament-filter" style={{ display: 'block', marginBottom: 8, fontSize: '14px', fontWeight: 500 }}>
+            Filter by Tournament (optional)
+          </label>
+          <div style={{ display: 'flex', gap: 8, maxWidth: 600 }}>
+            <input
+              id="tournament-search"
+              type="text"
+              placeholder="Search tournaments..."
+              value={tournamentSearch}
+              onChange={(e) => setTournamentSearch(e.target.value)}
+              style={{
+                flex: 1,
+                padding: '8px 12px',
+                background: '#1a1f2e',
+                border: '1px solid #2d3748',
+                borderRadius: '8px',
+                color: 'white',
+                fontSize: '14px',
+              }}
+            />
+            <select
+              id="tournament-filter"
+              value={selectedTournament || ''}
+              onChange={(e) => setSelectedTournament(e.target.value ? Number(e.target.value) : null)}
+              style={{
+                flex: 2,
+                padding: '8px 12px',
+                background: '#1a1f2e',
+                border: '1px solid #2d3748',
+                borderRadius: '8px',
+                color: 'white',
+                fontSize: '14px',
+              }}
+            >
+              <option value="">All Tournaments (Global)</option>
+              {filteredTournaments.map((t) => (
+                <option key={t.id} value={t.id}>{t.name}</option>
+              ))}
+            </select>
+            {selectedTournament && (
+              <button
+                type="button"
+                onClick={() => { setSelectedTournament(null); setTournamentSearch(''); }}
+                style={{
+                  padding: '8px 16px',
+                  background: '#ef4444',
+                  border: 'none',
+                  borderRadius: '8px',
+                  color: 'white',
+                  fontSize: '14px',
+                  cursor: 'pointer',
+                }}
+              >
+                Clear
+              </button>
+            )}
+          </div>
         </div>
 
         {/* Period selector */}
