@@ -1114,13 +1114,21 @@ def staff_generate_bracket_route(
     db: Session = Depends(get_db),
 ):
     """Staff version of generate bracket - supports multiple formats."""
+    import logging
+    logger = logging.getLogger(__name__)
+    
+    logger.info(f"📥 GENERATE BRACKET REQUEST: tournament_id={tournament_id}, payload={payload}")
+    
     if not is_tournament_admin(db, current_user, tournament_id):
+        logger.error(f"❌ User {current_user.id} is not tournament admin for tournament {tournament_id}")
         raise HTTPException(status_code=403, detail="Not assigned to this tournament")
     t = db.get(Tournament, tournament_id)
     if not t:
+        logger.error(f"❌ Tournament {tournament_id} not found")
         raise HTTPException(status_code=404, detail="Tournament not found")
     
     format_choice = payload.format if payload else "knockout"
+    logger.info(f"📊 Format choice: {format_choice}, payload type: {type(payload)}")
     
     # Different formats use different generation functions
     if format_choice == "round_robin":
