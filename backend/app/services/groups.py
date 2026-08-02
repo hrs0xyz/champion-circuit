@@ -44,8 +44,8 @@ def generate_groups(
     Raises:
         ValueError: If validation fails
     """
-    if tournament.status != "registration":
-        raise ValueError("Groups can only be generated during registration phase")
+    if tournament.status not in ["registration", "draft", "pending_approval"]:
+        raise ValueError(f"Cannot generate groups for tournament in '{tournament.status}' status")
     
     # Check format supports groups (check both format and format_type for compatibility)
     format_val = getattr(tournament, 'format_type', None) or tournament.format
