@@ -499,7 +499,7 @@ def regenerate_bracket(
     
     # Generate new bracket
     try:
-        generate_bracket(db, t, payload)
+        generate_bracket(db, tournament_id, current_user.id, payload.round_stage_map or {})
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     
