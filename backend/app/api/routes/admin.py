@@ -481,29 +481,106 @@ def regenerate_bracket(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """Delete existing bracket and regenerate with new format. v2"""
+    """Delete existing bracket and regenerate with new format."""
+    print(f"\n{'='*80}")
+    print(f"🔄 REGENERATE BRACKET REQUEST")
+    print(f"   Tournament ID: {tournament_id}")
+    print(f"   Payload: {payload}")
+    print(f"   Format: {payload.format}")
+    print(f"{'='*80}\n")
+    
     t = require_tournament_manage_access(db, current_user, tournament_id)
     
+    print(f"   Current tournament status: {t.status}")
+    print(f"   Current tournament format: {t.format}")
+    
     # Delete all existing matches for this tournament
+    print(f"   Deleting existing matches...")
     existing_matches = db.query(Match).filter(Match.tournament_id == tournament_id).all()
     for match in existing_matches:
         # Delete match participants
         db.query(MatchParticipant).filter(MatchParticipant.match_id == match.id).delete()
         db.delete(match)
+    print(f"   Deleted {len(existing_matches)} matches")
     
-    # Clear tournament format if switching
-    if payload.format:
-        t.format = payload.format
+    # Delete existing groups if any
+    print(f"   Deleting existing groups...")
+    existing_groups = db.query(TournamentGroup).filter(TournamentGroup.tournament_id == tournament_id).all()
+    for group in existing_groups:
+        db.query(TournamentGroupMember).filter(TournamentGroupMember.group_id == group.id).delete()
+        db.delete(group)
+    print(f"   Deleted {len(existing_groups)} groups")
     
     db.commit()
     
-    # Generate new bracket
-    try:
-        generate_bracket(db, tournament_id, current_user.id, payload.round_stage_map or {})
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+    # Now call the same generate logic based on format
+    format_choice = payload.format if payload.format else "knockout"
+    print(f"   Regenerating with format: {format_choice}\n")
     
-    return {"message": "Bracket regenerated successfully"}
+    # Reuse the same logic from generate-bracket endpoint
+    if format_choice == "round_robin":
+        from app.services.groups import generate_groups
+        
+        # For free tournaments, auto-mark all registrations as paid
+        if t.entry_fee_paise == 0:
+            db.query(TournamentRegistration).filter(
+                TournamentRegistration.tournament_id == tournament_id,
+                TournamentRegistration.payment_status == "unpaid"
+            ).update({"payment_status": "paid"})
+            db.commit()
+        
+        # Set format and status
+        t.format = "round_robin"
+        t.format_type = "round_robin"
+        if t.status not in ["registration", "live"]:
+            t.status = "registration"
+        db.commit()
+        db.refresh(t)
+        
+        # Count paid participants
+        paid_count = db.query(TournamentRegistration).filter(
+            TournamentRegistration.tournament_id == tournament_id,
+            TournamentRegistration.payment_status == "paid"
+        ).count()
+        
+        if paid_count < 2:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Need at least 2 paid participants (found {paid_count})"
+            )
+        
+        groups, total_matches = generate_groups(
+            db, t,
+            num_groups=1,
+            advance_per_group=max(1, paid_count),
+            points_win=3,
+            points_draw=1,
+            points_loss=0,
+        )
+        print(f"   ✅ Regenerated with {total_matches} round-robin matches\n")
+        
+        return {
+            "message": f"Round robin regenerated with {total_matches} matches",
+            "format": "round_robin",
+            "total_matches": total_matches,
+        }
+    
+    else:
+        # Knockout, page_playoff, swiss
+        t.format = "knockout"
+        t.format_type = "knockout"
+        if t.status not in ["registration", "live"]:
+            t.status = "registration"
+        db.commit()
+        
+        try:
+            generate_bracket(db, tournament_id, current_user.id, payload.round_stage_map or {})
+            print(f"   ✅ Regenerated knockout bracket\n")
+        except ValueError as e:
+            print(f"   ❌ Error: {str(e)}\n")
+            raise HTTPException(status_code=400, detail=str(e))
+        
+        return {"message": "Bracket regenerated successfully"}
 
 
 @router.post("/staff/tournaments/{tournament_id}/regenerate-bracket")
