@@ -1041,17 +1041,21 @@ function MatchList({ matches, participants, onVerify, onEdit, onWalkover }: {
 
           {/* Participants scores */}
           <div className="match-admin-scores">
-            {m.participants.map((p) => (
-              <div key={p.user_id} className="match-admin-score-row">
-                <span className="match-admin-score-row__user">
-                  {p.team !== 'none' ? `[${p.team}] ` : ''}User #{p.user_id}{p.role === 'captain' ? ' ©' : ''}
-                </span>
-                <span className="match-admin-score-row__result" style={{ color: p.result === 'win' ? '#4ade80' : p.result === 'loss' ? '#f87171' : '#fff' }}>
-                  {p.result || '—'}
-                </span>
-                <span className="match-admin-score-row__pts">{p.points_earned} pts</span>
-              </div>
-            ))}
+            {m.participants.map((p) => {
+              const participant = participants.find(part => part.user_id === p.user_id);
+              const displayName = participant ? `@${participant.username}` : `User #${p.user_id}`;
+              return (
+                <div key={p.user_id} className="match-admin-score-row">
+                  <span className="match-admin-score-row__user">
+                    {p.team !== 'none' ? `[${p.team}] ` : ''}{displayName}{p.role === 'captain' ? ' ©' : ''}
+                  </span>
+                  <span className="match-admin-score-row__result" style={{ color: p.result === 'win' ? '#4ade80' : p.result === 'loss' ? '#f87171' : '#fff' }}>
+                    {p.result || '—'}
+                  </span>
+                  <span className="match-admin-score-row__pts">{p.points_earned} pts</span>
+                </div>
+              );
+            })}
           </div>
 
           <div className="staff-card__actions">
@@ -1095,26 +1099,30 @@ function MatchList({ matches, participants, onVerify, onEdit, onWalkover }: {
           {editing === m.id && (
             <div className="staff-edit-scores">
               <p className="staff-h3" style={{ marginBottom: 12 }}>Edit scores</p>
-              {(editData.participants as typeof m.participants).map((p, i) => (
-                <div key={p.user_id} className="staff-score-edit-row">
-                  <span>{p.team !== 'none' ? `[${p.team}] ` : ''}User #{p.user_id}</span>
-                  <select className="auth-input" style={{ width: 100 }} value={p.result}
-                    onChange={(e) => {
-                      const ps = [...(editData.participants as typeof m.participants)];
-                      ps[i] = { ...ps[i], result: e.target.value };
-                      setEditData({ ...editData, participants: ps });
-                    }}>
-                    {['', 'win', 'loss', 'draw', 'dnf'].map((r) => <option key={r} value={r}>{r || 'no result'}</option>)}
-                  </select>
-                  <input className="auth-input" type="number" placeholder="Score" style={{ width: 80 }}
-                    value={(p as typeof p & { score: number }).score}
-                    onChange={(e) => {
-                      const ps = [...(editData.participants as typeof m.participants)];
-                      ps[i] = { ...ps[i], score: Number(e.target.value) };
-                      setEditData({ ...editData, participants: ps });
-                    }} />
-                </div>
-              ))}
+              {(editData.participants as typeof m.participants).map((p, i) => {
+                const participant = participants.find(part => part.user_id === p.user_id);
+                const displayName = participant ? `@${participant.username}` : `User #${p.user_id}`;
+                return (
+                  <div key={p.user_id} className="staff-score-edit-row">
+                    <span>{p.team !== 'none' ? `[${p.team}] ` : ''}{displayName}</span>
+                    <select className="auth-input" style={{ width: 100 }} value={p.result}
+                      onChange={(e) => {
+                        const ps = [...(editData.participants as typeof m.participants)];
+                        ps[i] = { ...ps[i], result: e.target.value };
+                        setEditData({ ...editData, participants: ps });
+                      }}>
+                      {['', 'win', 'loss', 'draw', 'dnf'].map((r) => <option key={r} value={r}>{r || 'no result'}</option>)}
+                    </select>
+                    <input className="auth-input" type="number" placeholder="Score" style={{ width: 80 }}
+                      value={(p as typeof p & { score: number }).score}
+                      onChange={(e) => {
+                        const ps = [...(editData.participants as typeof m.participants)];
+                        ps[i] = { ...ps[i], score: Number(e.target.value) };
+                        setEditData({ ...editData, participants: ps });
+                      }} />
+                  </div>
+                );
+              })}
               <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
                 <button type="button" className="btn btn-primary btn-sm" onClick={() => { onEdit(m.id, editData); setEditing(null); }}>Save</button>
                 <button type="button" className="btn btn-ghost btn-sm" onClick={() => setEditing(null)}>Cancel</button>
