@@ -992,8 +992,13 @@ function MatchList({ matches, onVerify, onEdit, onWalkover }: {
   const sorted = [...matches].sort((a, b) =>
     a.round_number - b.round_number || a.bracket_position - b.bracket_position || a.id - b.id);
 
-  const sideOf = (m: Match, side: string) =>
-    m.participants.filter((p) => p.team === side).map((p) => `#${p.user_id}`).join(', ');
+  const sideOf = (m: Match, side: string) => {
+    const userIds = m.participants.filter((p) => p.team === side).map((p) => p.user_id);
+    return userIds.map(uid => {
+      const participant = participants.find(p => p.user_id === uid);
+      return participant ? `@${participant.username}` : `#${uid}`;
+    }).join(', ');
+  };
 
   async function saveSchedule(m: Match) {
     if (!newTime) { setScheduling(null); return; }
