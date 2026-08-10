@@ -532,8 +532,8 @@ def regenerate_bracket(
         # Set format and status
         t.format = "round_robin"
         t.format_type = "round_robin"
-        if t.status not in ["registration", "live"]:
-            t.status = "registration"
+        # Always set to registration when regenerating
+        t.status = "registration"
         db.commit()
         db.refresh(t)
         
@@ -569,8 +569,8 @@ def regenerate_bracket(
         # Knockout, page_playoff, swiss
         t.format = "knockout"
         t.format_type = "knockout"
-        if t.status not in ["registration", "live"]:
-            t.status = "registration"
+        # Always set to registration when regenerating
+        t.status = "registration"
         db.commit()
         
         try:
