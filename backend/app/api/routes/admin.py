@@ -42,7 +42,7 @@ from app.api.deps import get_current_user, is_tournament_admin, require_tourname
 from app.db.session import get_db
 from app.models.match import (
     Match, MatchParticipant, Team, Tournament, TournamentAdmin,
-    TournamentRegistration, TournamentStage,
+    TournamentGroup, TournamentGroupMember, TournamentRegistration, TournamentStage,
 )
 from app.models.user import User
 from app.models.venue import Venue
