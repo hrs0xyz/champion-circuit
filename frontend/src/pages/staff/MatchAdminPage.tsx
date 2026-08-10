@@ -251,7 +251,7 @@ export function MatchAdminPage() {
                 onMsg={(msg, type) => { setMsg(msg); if (type) setMsgType(type); }}
               />
             )}
-            {tab === 'matches' && <MatchList matches={matches} onVerify={async (id) => {
+            {tab === 'matches' && <MatchList matches={matches} participants={participants} onVerify={async (id) => {
               try {
                 await staffReq(`/api/staff/matches/${id}/verify`, { method: 'POST' });
                 await refreshData(selected);
@@ -977,8 +977,9 @@ function ParticipantsList({ tournamentId, participants, onChanged, onMsg }: {
   );
 }
 
-function MatchList({ matches, onVerify, onEdit, onWalkover }: {
+function MatchList({ matches, participants, onVerify, onEdit, onWalkover }: {
   matches: Match[];
+  participants: StaffParticipant[];
   onVerify: (id: number) => void;
   onEdit: (id: number, data: object) => void;
   onWalkover: (id: number, side: 'A' | 'B') => void;
