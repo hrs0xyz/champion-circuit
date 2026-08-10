@@ -549,21 +549,25 @@ def regenerate_bracket(
                 detail=f"Need at least 2 paid participants (found {paid_count})"
             )
         
-        groups, total_matches = generate_groups(
-            db, t,
-            num_groups=1,
-            advance_per_group=max(1, paid_count),
-            points_win=3,
-            points_draw=1,
-            points_loss=0,
-        )
-        print(f"   ✅ Regenerated with {total_matches} round-robin matches\n")
-        
-        return {
-            "message": f"Round robin regenerated with {total_matches} matches",
-            "format": "round_robin",
-            "total_matches": total_matches,
-        }
+        try:
+            groups, total_matches = generate_groups(
+                db, t,
+                num_groups=1,
+                advance_per_group=max(1, paid_count),
+                points_win=3,
+                points_draw=1,
+                points_loss=0,
+            )
+            print(f"   ✅ Regenerated with {total_matches} round-robin matches\n")
+            
+            return {
+                "message": f"Round robin regenerated with {total_matches} matches",
+                "format": "round_robin",
+                "total_matches": total_matches,
+            }
+        except ValueError as e:
+            print(f"   ❌ Error: {str(e)}\n")
+            raise HTTPException(status_code=400, detail=str(e))
     
     else:
         # Knockout, page_playoff, swiss
